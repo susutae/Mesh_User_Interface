@@ -32,6 +32,15 @@ function toMbits(value, unit) {
   return numericValue;
 }
 
+function toMBytes(value, unit) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return null;
+  const normalizedUnit = unit.toLowerCase();
+  if (normalizedUnit.startsWith("k")) return numericValue / 1000;
+  if (normalizedUnit.startsWith("g")) return numericValue * 1000;
+  return numericValue;
+}
+
 export function extractIperfMetrics(text) {
   const formattedText = formatToolText(text || "");
   const lines = formattedText.split("\n").filter(Boolean);
@@ -39,6 +48,7 @@ export function extractIperfMetrics(text) {
     throughputMbps: null,
     averageThroughputMbps: null,
     throughputSamples: [],
+    transferMBytes: null,
     jitterMs: null,
     packetLossPercent: null,
     datagrams: null,
@@ -52,6 +62,11 @@ export function extractIperfMetrics(text) {
       const throughputMbps = toMbits(throughput[1], throughput[2]);
       metrics.throughputMbps = throughputMbps;
       metrics.transferLine = line;
+
+      const transfer = line.match(/([\d.]+)\s+([KMG])Bytes/i);
+      if (transfer) {
+        metrics.transferMBytes = toMBytes(transfer[1], transfer[2]);
+      }
 
       const interval = line.match(/\]\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s+sec/i);
       if (Number.isFinite(throughputMbps) && interval) {
@@ -190,6 +205,8 @@ export function buildIperfSummary(clientResult, serverResult) {
     recommendation,
     averageThroughputMbps,
     throughputMbps: primary.throughputMbps,
+    clientTransferMBytes: client.transferMBytes,
+    serverTransferMBytes: server.transferMBytes,
     sampleCount: primary.throughputSamples.length,
     jitterMs: jitter,
     packetLossPercent: packetLoss,

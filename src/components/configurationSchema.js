@@ -37,6 +37,7 @@ export const GLOBAL_CONFIG_KEYS = new Set([
   "enduserName",
   "freqDefault",
   "freqList",
+  "freqListTx",
   "freqMode",
   "ipMulticastFilterMode",
   "mcMode",

@@ -764,6 +764,7 @@ export default function ConfigurationPage({
     useState(null);
   const lastAppliedTargetRef = useRef(null);
   const importInputRef = useRef(null);
+  const frequencyImportInputRef = useRef(null);
 
   // Frequency editor state
   const [frequencyEditor, setFrequencyEditor] = useState(null);
@@ -847,6 +848,19 @@ export default function ConfigurationPage({
     [activeTab, draft],
   );
 
+  // Keep active tab metadata above pendingApplyEntries because the
+  // update-all-nodes frequency-list collector uses activeLabel during render.
+  const visibleTabs = TABS;
+  const activeTabDefinition = visibleTabs.find((tab) => tab.id === activeTab);
+  const activeLabel = activeTabDefinition
+    ? configTabLabel(activeTabDefinition)
+    : "";
+  const activeDescription = activeTabDefinition
+    ? configTabDescription(activeTabDefinition)
+    : "";
+  const ActiveConfig = CONFIG_COMPONENTS[activeTab] || RfConfig;
+  const availableNetworkInterfaces = networkInterfaceOptions();
+
   const pendingApplyEntries = useMemo(
     () => collectActiveTabPostEntries(),
     [config, draft, updateAllNodes, visibleHeaderSections],
@@ -865,6 +879,24 @@ export default function ConfigurationPage({
       remaining: Math.max(0, labels.length - 3),
     };
   }, [pendingApplyEntries, t]);
+
+  async function postConfigEntries(entries, applyGlobally, signal) {
+    if (applyGlobally) {
+      await postJson(
+        `${baseUrl}/config?content=configGlobal`,
+        { configGlobal: true },
+        signal,
+      );
+    }
+
+    for (const { key, value } of entries) {
+      await postJson(
+        `${baseUrl}/config?content=${encodeURIComponent(key)}`,
+        { [key]: value },
+        signal,
+      );
+    }
+  }
 
   const configurationSearchResults = useMemo(() => {
     const query = normaliseSearchText(configurationSearch);
@@ -1042,6 +1074,23 @@ export default function ConfigurationPage({
     };
   }
 
+  function collectGlobalFrequencyListEntries() {
+    if (!updateAllNodes) return [];
+
+    return ["freqList", "freqListTx"]
+      .filter((key) => GLOBAL_CONFIG_KEYS.has(key))
+      .filter((key) => isDraftValueModified(key, draft, config))
+      .map((key) => {
+        const field = findConfigField(key);
+        return {
+          key,
+          value: normalizeConfigPostValue(key, draft[key], field),
+          field,
+          sectionTitle: activeLabel,
+        };
+      });
+  }
+
   function collectActiveTabPostEntries() {
     const entries = new Map();
 
@@ -1051,6 +1100,10 @@ export default function ConfigurationPage({
         .forEach((entry) => {
           entries.set(entry.key, { ...entry, sectionTitle: section.title });
         });
+    });
+
+    collectGlobalFrequencyListEntries().forEach((entry) => {
+      entries.set(entry.key, entry);
     });
 
     return [...entries.values()];
@@ -1110,13 +1163,11 @@ export default function ConfigurationPage({
     );
 
     try {
-      const patch = {
-        ...Object.fromEntries(
-          pendingReview.entries.map(({ key, value }) => [key, value]),
-        ),
-        ...(pendingReview.applyGlobally ? { configGlobal: true } : {}),
-      };
-      await postJson(`${baseUrl}/config`, patch, controller.signal);
+      await postConfigEntries(
+        pendingReview.entries,
+        pendingReview.applyGlobally,
+        controller.signal,
+      );
 
       // Update loaded config to match draft for applied keys
       setConfig((current) => ({
@@ -1169,14 +1220,28 @@ export default function ConfigurationPage({
     );
 
     if (!nextValue) {
-      setUpdateAllNodes(false);
-      setNotice(
-        t(
-          "configuration.updateAllDisabled",
-          "Update All Nodes disabled. Settings will apply to this node only.",
-        ),
-      );
-      setUpdatingGlobal(false);
+      try {
+        await postJson(
+          `${baseUrl}/config?content=configGlobal`,
+          { configGlobal: false },
+          controller.signal,
+        );
+        setUpdateAllNodes(false);
+        setNotice(
+          t(
+            "configuration.updateAllDisabled",
+            "Update All Nodes disabled. Settings will apply to this node only.",
+          ),
+        );
+      } catch (requestError) {
+        setError(
+          requestError?.message ||
+            t("configuration.updateAllFailed", "Unable to update configGlobal."),
+        );
+        setNotice("");
+      } finally {
+        setUpdatingGlobal(false);
+      }
       return;
     }
 
@@ -1251,11 +1316,10 @@ export default function ConfigurationPage({
         );
       }
 
-      const payload = {
-        ...Object.fromEntries(entries),
-        ...(updateAllNodes ? { configGlobal: true } : {}),
-      };
-      await postJson(`${baseUrl}/config`, payload);
+      await postConfigEntries(
+        entries.map(([key, value]) => ({ key, value })),
+        updateAllNodes,
+      );
       await load(new AbortController().signal);
 
       const skippedText = skipped.length
@@ -1341,6 +1405,119 @@ export default function ConfigurationPage({
   }
 
   // --- Frequency Editor Functions ---
+
+  function normaliseImportedFrequencyList(value) {
+    return parseFrequencyList(value)
+      .map((frequency) => {
+        const numeric = Number(frequency);
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        return Math.round(numeric < 1_000_000 ? numeric * 1_000_000 : numeric);
+      })
+      .filter((frequency) => Number.isFinite(frequency) && frequency > 0);
+  }
+
+  async function importFrequencyListFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !frequencyEditor) return;
+
+    const listKey = frequencyEditor.listKey || "freqList";
+    const defaultKey = frequencyEditor.defaultKey || "freqDefault";
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const source =
+        parsed?.uniformityParam &&
+        typeof parsed.uniformityParam === "object" &&
+        !Array.isArray(parsed.uniformityParam)
+          ? parsed.uniformityParam
+          : parsed;
+      const candidate = Array.isArray(source)
+        ? source
+        : source?.[listKey] ?? source?.frequencies ?? source?.frequencyList;
+      const nextList = normaliseImportedFrequencyList(candidate);
+
+      if (!nextList.length) {
+        throw new Error(
+          t(
+            "configurationManagers.notices.frequencyImportEmpty",
+            "No valid frequencies found in the selected file.",
+          ),
+        );
+      }
+
+      setDraft((current) => ({
+        ...current,
+        [listKey]: nextList.join(", "),
+        [defaultKey]: String(
+          Math.min(
+            Math.max(0, Number(current[defaultKey]) || 0),
+            Math.max(0, nextList.length - 1),
+          ),
+        ),
+      }));
+      setNotice(
+        t(
+          "configurationManagers.notices.frequencyImported",
+          "{count} frequencies imported into {title}.",
+          { count: nextList.length, title: frequencyEditor.title },
+        ),
+      );
+    } catch (requestError) {
+      setError(
+        requestError?.message ||
+          t(
+            "configurationManagers.notices.frequencyImportFailed",
+            "Unable to import frequency list.",
+          ),
+      );
+      setNotice("");
+    }
+  }
+
+  function exportFrequencyListFile() {
+    if (!frequencyEditor) return;
+
+    const listKey = frequencyEditor.listKey || "freqList";
+    const list = parseFrequencyList(draft[listKey]);
+
+    if (!list.length) {
+      setNotice(
+        t(
+          "configurationManagers.notices.frequencyExportEmpty",
+          "No frequencies are available to export.",
+        ),
+      );
+      return;
+    }
+
+    const payload = {
+      version: serializeValue(draft.firmwareVersion || draft.version || ""),
+      uniformityParam: {
+        [listKey]: list,
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeIp = serializeValue(deviceIp).replace(/[^a-z0-9.-]+/gi, "_");
+    link.href = url;
+    link.download = `${listKey}-${safeIp || "device"}.msconf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setNotice(
+      t(
+        "configurationManagers.notices.frequencyExported",
+        "{count} frequencies exported from {title}.",
+        { count: list.length, title: frequencyEditor.title },
+      ),
+    );
+  }
 
   /**
    * Adds a single frequency to the list.
@@ -2152,18 +2329,6 @@ export default function ConfigurationPage({
     return parts.join(" > ");
   }
 
-  // Get current tab information
-  const visibleTabs = TABS;
-  const activeTabDefinition = visibleTabs.find((tab) => tab.id === activeTab);
-  const activeLabel = activeTabDefinition
-    ? configTabLabel(activeTabDefinition)
-    : "";
-  const activeDescription = activeTabDefinition
-    ? configTabDescription(activeTabDefinition)
-    : "";
-  const ActiveConfig = CONFIG_COMPONENTS[activeTab] || RfConfig;
-  const availableNetworkInterfaces = networkInterfaceOptions();
-
   return (
     <section className="configuration-page">
       <div className="configuration-workspace">
@@ -2691,6 +2856,27 @@ export default function ConfigurationPage({
                 )}
               </div>
               <div className="configuration-frequency-modal-actions">
+                <input
+                  ref={frequencyImportInputRef}
+                  className="configuration-import-input"
+                  type="file"
+                  accept=".msconf,.json,application/json"
+                  onChange={importFrequencyListFile}
+                />
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => frequencyImportInputRef.current?.click()}
+                >
+                  {t("common.import", "Import")}
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={exportFrequencyListFile}
+                >
+                  {t("common.export", "Export")}
+                </button>
                 <button type="button" onClick={() => setFrequencyEditor(null)}>
                   {t("configurationManagers.actions.done", "Done")}
                 </button>

@@ -31,6 +31,17 @@ function formatTimestamp(value, t) {
   return date.toLocaleString();
 }
 
+function formatDataAmount(value) {
+  if (!Number.isFinite(value)) return "--";
+  if (value >= 1024) return `${(value / 1024).toFixed(2)} GB`;
+  return `${value.toFixed(value >= 100 ? 0 : 1)} MB`;
+}
+
+function clampPercent(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
 export default function IperfTool({ deviceIp, protocol = "http" }) {
   const { t } = useI18n();
   const storageKey = useMemo(
@@ -176,6 +187,25 @@ export default function IperfTool({ deviceIp, protocol = "http" }) {
     () => buildIperfSummary(clientResult, serverResult),
     [clientResult, serverResult],
   );
+  const targetBandwidthMbps = Number(bandwidth);
+  const throughputPercent = clampPercent(
+    Number.isFinite(iperfSummary.averageThroughputMbps) &&
+      Number.isFinite(targetBandwidthMbps) &&
+      targetBandwidthMbps > 0
+      ? (iperfSummary.averageThroughputMbps / targetBandwidthMbps) * 100
+      : 0,
+  );
+  const clientDataSent = iperfSummary.clientTransferMBytes ?? iperfSummary.serverTransferMBytes;
+  const qualityStatus =
+    Number.isFinite(iperfSummary.packetLossPercent) && iperfSummary.packetLossPercent > 1
+      ? "poor"
+      : throughputPercent >= 90
+        ? "excellent"
+        : throughputPercent >= 70
+          ? "good"
+          : throughputPercent >= 50
+            ? "fair"
+            : "poor";
   const isBusy = Boolean(busyAction);
 
   function sideConfig(side) {
@@ -696,26 +726,67 @@ export default function IperfTool({ deviceIp, protocol = "http" }) {
                   {iperfSummary.issue && <small>{iperfSummary.issue}</small>}
                 </div>
               </section>
-              <div className="tools-result-grid">
-                <section className="tools-result-card">
-                  <div className="tools-iperf-result-title">
-                    <span>{t("tools.iperf.serverResult", "Server Result")}</span>
-                    <small>{formatTimestamp(serverUpdatedAt, t)}</small>
+              <section className={`iperf-data-bar-card ${qualityStatus}`}>
+                <div className="iperf-data-bar-head">
+                  <div>
+                    <span>{t("tools.iperf.clientDataSent", "Client data sent")}</span>
+                    <strong>{formatDataAmount(clientDataSent)}</strong>
                   </div>
-                  <pre className="tools-result">
-                    {serverResult || t("tools.iperf.noServerResult", "No server result yet.")}
-                  </pre>
-                </section>
-                <section className="tools-result-card">
-                  <div className="tools-iperf-result-title">
-                    <span>{t("tools.iperf.clientResult", "Client Result")}</span>
-                    <small>{formatTimestamp(clientUpdatedAt, t)}</small>
+                  <div>
+                    <span>{t("tools.iperf.serverReceived", "Server UDP received")}</span>
+                    <strong>
+                      {formatMetric(iperfSummary.averageThroughputMbps, "Mbps")}
+                    </strong>
                   </div>
-                  <pre className="tools-result">
-                    {clientResult || t("tools.iperf.noClientResult", "No client result yet.")}
-                  </pre>
-                </section>
-              </div>
+                  <div>
+                    <span>{t("tools.iperf.targetBandwidth", "Target bandwidth")}</span>
+                    <strong>{formatMetric(targetBandwidthMbps, "Mbps")}</strong>
+                  </div>
+                </div>
+                <div className="iperf-data-bar-track">
+                  <div
+                    className="iperf-data-bar-fill"
+                    style={{ width: `${throughputPercent}%` }}
+                  />
+                </div>
+                <div className="iperf-data-bar-footer">
+                  <span>
+                    {t("tools.iperf.throughputTarget", "Throughput vs target")}:{" "}
+                    {throughputPercent.toFixed(0)}%
+                  </span>
+                  <span>
+                    {t("tools.iperf.loss", "Loss")}:{" "}
+                    {formatMetric(iperfSummary.packetLossPercent, "%", 2)}
+                  </span>
+                  <span>
+                    {t("tools.iperf.jitter", "Jitter")}:{" "}
+                    {formatMetric(iperfSummary.jitterMs, "ms", 2)}
+                  </span>
+                </div>
+              </section>
+              <details className="iperf-raw-results">
+                <summary>{t("tools.iperf.showRawResults", "Show Raw Results")}</summary>
+                <div className="tools-result-grid">
+                  <section className="tools-result-card">
+                    <div className="tools-iperf-result-title">
+                      <span>{t("tools.iperf.serverResult", "Server Result")}</span>
+                      <small>{formatTimestamp(serverUpdatedAt, t)}</small>
+                    </div>
+                    <pre className="tools-result">
+                      {serverResult || t("tools.iperf.noServerResult", "No server result yet.")}
+                    </pre>
+                  </section>
+                  <section className="tools-result-card">
+                    <div className="tools-iperf-result-title">
+                      <span>{t("tools.iperf.clientResult", "Client Result")}</span>
+                      <small>{formatTimestamp(clientUpdatedAt, t)}</small>
+                    </div>
+                    <pre className="tools-result">
+                      {clientResult || t("tools.iperf.noClientResult", "No client result yet.")}
+                    </pre>
+                  </section>
+                </div>
+              </details>
             </>
           ) : (
             <div className="tools-result-placeholder">

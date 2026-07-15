@@ -219,17 +219,36 @@ function formatCoordinate(value) {
 }
 
 /**
- * Calculates Mbps based on bytes transferred and time elapsed.
- * Formula: (Bytes * 8 bits/byte) / (Milliseconds / 1000 ms/sec) / 1,000,000 bits/Mbit
- * Simplified to: (Bytes * 8) / milliseconds / 1000
+ * Converts a byte-per-second API value to decimal Mbps.
+ * Formula: (Bytes per second * 8) / 1,000,000.
  *
- * @param {number} bytesDelta - Difference in byte counter (positive)
- * @param {number} elapsedMs - Time difference in milliseconds (positive)
+ * @param {number} bytesPerSecond - API value in bytes per second
  * @returns {number} Data rate in Mbps
  */
-function toMbps(bytesDelta, elapsedMs) {
-  if (bytesDelta < 0 || elapsedMs <= 0) return 0;
-  return (bytesDelta * 8) / elapsedMs / 1000;
+function toMbps(bytesPerSecond) {
+  const bytes = Number(bytesPerSecond);
+  return Number.isFinite(bytes) && bytes >= 0 ? (bytes * 8) / 1_000_000 : 0;
+}
+
+/**
+ * Reads a PHY byte-per-second value from the device response.
+ * Firmware builds have returned both lower- and upper-cased key names, and
+ * some responses contain whitespace around the JSON key.
+ */
+function readPhyBytes(result, field) {
+  const aliases = [
+    field,
+    field[0].toUpperCase() + field.slice(1),
+    ` ${field} `,
+    ` ${field[0].toUpperCase() + field.slice(1)} `,
+  ];
+
+  for (const key of aliases) {
+    const value = Number(result?.[key]);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return 0;
 }
 
 /**
@@ -1491,7 +1510,7 @@ export default function MainCanvas({
   // Nested map containing individual node status telemetry (e.g. temperature, delays)
   const [nodeTelemetry, setNodeTelemetry] = useState({});
   // Network data rate transfer calculations in Mbps
-  const [rates, setRates] = useState({ rxMbps: 0, txMbps: 0 });
+  const [nodeRates, setNodeRates] = useState({});
 
   // Default topology state: no node is selected, so NODE INFORMATION is hidden.
   // It appears only after the user clicks a node on the canvas or node list.
@@ -1528,7 +1547,6 @@ export default function MainCanvas({
   // Reference to the SVG viewport container element to observe container size changes
   const stageRef = useRef(null);
   // Holds previous cumulative byte counters and timestamp to compute throughput rate limits
-  const countersRef = useRef({ rx: null, tx: null, at: null });
 
   // Normalised device API base URL
   const baseUrl = useMemo(
@@ -1584,21 +1602,17 @@ export default function MainCanvas({
 
       try {
         // Main topology data. These no-port endpoints draw the graph:
-        // node list, link quality matrix, distance baseline, and bandwidth rates.
+        // node list, link quality matrix, and distance baseline.
         const [
           nodeResult,
           linkResult,
           heterogeneousResult,
           delayResult,
-          rxResult,
-          txResult,
         ] = await Promise.all([
           fetchJson(`${baseUrl}/status?content=nodeInfos`, signal),
           fetchJson(`${baseUrl}/status?content=linkQuality`, signal),
           fetchHeterogeneousLinkGroups(baseUrl, signal),
           fetchJson(`${baseUrl}/status?content=transmissionDelay`, signal),
-          fetchJson(`${baseUrl}/statusadvanced?content=phyRxBytes`, signal),
-          fetchJson(`${baseUrl}/statusadvanced?content=phyTxBytes`, signal),
         ]);
 
         const receivedNodes = Array.isArray(nodeResult?.nodeInfos)
@@ -1608,25 +1622,25 @@ export default function MainCanvas({
           (a, b) => Number(a.id) - Number(b.id),
         );
 
-        // Extract phy Rx and Tx bytes, supporting space-padded fallback keys
-        const rx = Number(
-          rxResult?.phyRxBytes ?? rxResult?.[" phyRxBytes "] ?? 0,
+        // Read PHY values from each node so RX/TX belong to the selected node.
+        const resolvedRates = await Promise.all(
+          sortedNodes.map(async (node) => {
+            if (!node.ip) return [node.id, { rxMbps: 0, txMbps: 0 }];
+            try {
+              const [rxResult, txResult] = await Promise.all([
+                fetchJson(`${protocol}://${node.ip}/statusadvanced?content=phyRxBytes`, signal),
+                fetchJson(`${protocol}://${node.ip}/statusadvanced?content=phyTxBytes`, signal),
+              ]);
+              return [node.id, {
+                rxMbps: toMbps(readPhyBytes(rxResult, "phyRxBytes")),
+                txMbps: toMbps(readPhyBytes(txResult, "phyTxBytes")),
+              }];
+            } catch {
+              return [node.id, { rxMbps: 0, txMbps: 0 }];
+            }
+          }),
         );
-        const tx = Number(
-          txResult?.phyTxBytes ?? txResult?.[" phyTxBytes "] ?? 0,
-        );
-        const now = Date.now();
-        const previous = countersRef.current;
-
-        // Calculate rate throughput delta if we have a previous baseline
-        if (previous.at !== null) {
-          const elapsed = Math.max(1, now - previous.at);
-          setRates({
-            rxMbps: toMbps(rx - previous.rx, elapsed),
-            txMbps: toMbps(tx - previous.tx, elapsed),
-          });
-        }
-        countersRef.current = { rx, tx, at: now };
+        setNodeRates(Object.fromEntries(resolvedRates));
 
         setRawNodes(sortedNodes);
         setLinkQuality(
@@ -2591,8 +2605,8 @@ export default function MainCanvas({
                       incomingLinks={incomingLinks}
                       heterogeneousLink={selectedHeterogeneousLink}
                       temperature={selectedTelemetry.temp}
-                      rxMbps={rates.rxMbps}
-                      txMbps={rates.txMbps}
+                      rxMbps={nodeRates[selectedNode.id]?.rxMbps ?? 0}
+                      txMbps={nodeRates[selectedNode.id]?.txMbps ?? 0}
                       pinned={nodeInfoPinned}
                       onTogglePinned={() =>
                         setNodeInfoPinned((current) => !current)

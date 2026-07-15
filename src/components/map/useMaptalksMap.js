@@ -345,6 +345,18 @@ export function useMaptalksMap({
     });
   }, [fitMapToNodes, hasAutoFitted, validNodes]);
 
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    const map = mapRef.current;
+    if (!container || !map || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      map.checkSize();
+      if (validNodes.length && hasAutoFitted) fitMapToNodes(validNodes);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [fitMapToNodes, hasAutoFitted, validNodes]);
+
   return {
     fitMapToNodes,
     getCurrentMapView,

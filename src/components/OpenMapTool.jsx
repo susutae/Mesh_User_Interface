@@ -77,6 +77,64 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, numericValue));
 }
 
+function numberValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function estimateCoverageRadiusKm({ frequencyMhz, outputPowerDbm }) {
+  if (!Number.isFinite(frequencyMhz) || !Number.isFinite(outputPowerDbm)) return null;
+  // Conservative planning assumptions; this remains an estimate because
+  // terrain, antenna height, obstruction, and interference are not modeled.
+  const receiverSensitivityDbm = -98;
+  const fadeMarginDb = 15;
+  const antennaGainDb = 2;
+  const cableLossDb = 1;
+  const maxPathLossDb =
+    outputPowerDbm + antennaGainDb - cableLossDb + antennaGainDb - cableLossDb -
+    receiverSensitivityDbm - fadeMarginDb;
+  const distanceKm = 10 ** (
+    (maxPathLossDb - 32.44 - 20 * Math.log10(Math.max(1, frequencyMhz))) / 20
+  );
+  return Number.isFinite(distanceKm)
+    ? Math.min(200, Math.max(0.1, distanceKm))
+    : null;
+}
+
+async function loadNodeRfProfile(node, protocol, signal) {
+  if (!node?.ip) return [node?.id, null];
+  const nodeBaseUrl = `${protocol}://${node.ip}`;
+  const read = async (path) => {
+    try {
+      return await fetchJson(`${nodeBaseUrl}${path}`, signal);
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    }
+  };
+  const [defaultResult, listResult, maxPowerResult, attenuationResult] =
+    await Promise.all([
+      read("/config?content=freqDefault"),
+      read("/config?content=freqList"),
+      read("/deviceinfo?content=powerMaxAtten"),
+      read("/config?content=pwAtten1"),
+    ]);
+  const frequencyList = Array.isArray(listResult?.freqList) ? listResult.freqList : [];
+  const defaultValue = numberValue(defaultResult?.freqDefault);
+  const frequencyHz =
+    frequencyList[defaultValue ?? 0] ??
+    (defaultValue > 1_000_000 ? defaultValue : null);
+  const frequencyMhz = frequencyHz ? frequencyHz / 1_000_000 : null;
+  const maxPowerDbm = numberValue(maxPowerResult?.powerMaxAtten);
+  const attenuationDb = numberValue(attenuationResult?.pwAtten1) ?? 0;
+  const outputPowerDbm = maxPowerDbm === null ? null : maxPowerDbm - attenuationDb;
+  return [node.id, {
+    frequencyMhz,
+    outputPowerDbm,
+    estimatedRadiusKm: estimateCoverageRadiusKm({ frequencyMhz, outputPowerDbm }),
+  }];
+}
+
 function buildOfflineCoverageCircle(offlineCalibration, node, position, radiusKm) {
   const latitude = Number(node.latitude);
   const longitude = Number(node.longitude);
@@ -132,12 +190,14 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
 
   // --- Component States ---
   const [nodes, setNodes] = useState([]);
+  const [rfProfiles, setRfProfiles] = useState({});
   const [linkQuality, setLinkQuality] = useState([]);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   const [layer, setLayer] = useState("roadmap");
   const [showSnrLinks, setShowSnrLinks] = useState(true);
   const [coverageEnabled, setCoverageEnabled] = useState(false);
+  const [coverageUseRfEstimate, setCoverageUseRfEstimate] = useState(true);
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(3);
   const [coverageOpacity, setCoverageOpacity] = useState(0.22);
   const [selectedNodeId, setSelectedNodeId] = useState("");
@@ -192,6 +252,10 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
         ),
       );
       setNodes([...namedNodes].sort((a, b) => Number(a.id) - Number(b.id)));
+      const profiles = await Promise.all(
+        namedNodes.map((node) => loadNodeRfProfile(node, protocol, signal)),
+      );
+      setRfProfiles(Object.fromEntries(profiles.filter(([, profile]) => profile)));
       setLinkQuality(
         Array.isArray(linkResult?.linkQuality) ? linkResult.linkQuality : [],
       );
@@ -242,10 +306,27 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
       nodeName: node.name || `node${node.id}`,
       latitude: node.latitude,
       longitude: node.longitude,
-      radiusKm: normalisedCoverageRadiusKm,
-      radiusMeters: normalisedCoverageRadiusKm * 1000,
+      radiusKm:
+        coverageUseRfEstimate && rfProfiles[node.id]?.estimatedRadiusKm
+          ? rfProfiles[node.id].estimatedRadiusKm
+          : normalisedCoverageRadiusKm,
+      radiusMeters:
+        (coverageUseRfEstimate && rfProfiles[node.id]?.estimatedRadiusKm
+          ? rfProfiles[node.id].estimatedRadiusKm
+          : normalisedCoverageRadiusKm) * 1000,
+      frequencyMhz: rfProfiles[node.id]?.frequencyMhz ?? null,
+      outputPowerDbm: rfProfiles[node.id]?.outputPowerDbm ?? null,
+      estimated: Boolean(
+        coverageUseRfEstimate && rfProfiles[node.id]?.estimatedRadiusKm,
+      ),
     }));
-  }, [coverageEnabled, normalisedCoverageRadiusKm, validNodes]);
+  }, [
+    coverageEnabled,
+    coverageUseRfEstimate,
+    normalisedCoverageRadiusKm,
+    rfProfiles,
+    validNodes,
+  ]);
   const mapCenter =
     selectedNode && isCoordinateValid(selectedNode)
       ? selectedNode
@@ -716,6 +797,7 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
 
             <MapToolbar
               coverageEnabled={coverageEnabled}
+              coverageUseRfEstimate={coverageUseRfEstimate}
               coverageOpacity={normalisedCoverageOpacity}
               coverageRadiusKm={normalisedCoverageRadiusKm}
               externalMapUrl={externalMapUrl}
@@ -741,6 +823,7 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
               onSetCalibrationMode={startCalibrationMode}
               onClearOfflineCalibration={clearOfflineCalibration}
               onSetCoverageEnabled={setCoverageEnabled}
+              onSetCoverageUseRfEstimate={setCoverageUseRfEstimate}
               onSetCoverageOpacity={setCoverageOpacity}
               onSetCoverageRadiusKm={setCoverageRadiusKm}
               onSetLayer={(nextLayer) => {
@@ -926,9 +1009,14 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
                       : t("map.coverageLegendEmpty", "No mapped nodes for coverage")}
                   </span>
                   <span>
-                    {t("map.coverageRadiusSummary", "Radius {radius} km", {
-                      radius: normalisedCoverageRadiusKm.toFixed(1),
-                    })}
+                    {coverageUseRfEstimate
+                      ? t(
+                          "map.coverageRfEstimateSummary",
+                          "Radius estimated per node from frequency and RF output power",
+                        )
+                      : t("map.coverageRadiusSummary", "Radius {radius} km", {
+                          radius: normalisedCoverageRadiusKm.toFixed(1),
+                        })}
                   </span>
                   <em>{t("map.coverageOverlapHint", "Overlaps appear stronger.")}</em>
                 </div>
@@ -948,7 +1036,9 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
                             offlineCalibration,
                             node,
                             position,
-                            normalisedCoverageRadiusKm,
+                            coverageUseRfEstimate && rfProfiles[node.id]?.estimatedRadiusKm
+                              ? rfProfiles[node.id].estimatedRadiusKm
+                              : normalisedCoverageRadiusKm,
                           );
                           if (!radius) return null;
                           return (

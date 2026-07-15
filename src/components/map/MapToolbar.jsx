@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n/index.js";
 
 export default function MapToolbar({
   coverageEnabled = false,
+  coverageUseRfEstimate = true,
   coverageOpacity = 0.22,
   coverageRadiusKm = 3,
   isCalibratedOffline = false,
@@ -19,6 +20,7 @@ export default function MapToolbar({
   onSaveCurrentMapView,
   onSetCalibrationMode,
   onSetCoverageEnabled,
+  onSetCoverageUseRfEstimate,
   onSetCoverageOpacity,
   onSetCoverageRadiusKm,
   onSetLayer,
@@ -101,6 +103,16 @@ export default function MapToolbar({
           <span>{t("map.coverageOverlay", "Coverage Overlay")}</span>
         </label>
         {coverageEnabled && (
+          <label className="tools-map-coverage-toggle">
+            <input
+              type="checkbox"
+              checked={coverageUseRfEstimate}
+              onChange={(event) => onSetCoverageUseRfEstimate(event.target.checked)}
+            />
+            <span>{t("map.coverageRfEstimate", "RF estimate")}</span>
+          </label>
+        )}
+        {coverageEnabled && !coverageUseRfEstimate && (
           <>
             <label className="tools-map-coverage-number">
               <span>{t("map.coverageRadiusKm", "Radius (km)")}</span>

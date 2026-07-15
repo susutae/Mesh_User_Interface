@@ -1553,8 +1553,8 @@ export default function MainCanvas({
   useEffect(() => {
     if (!stageRef.current) return undefined;
     const observer = new ResizeObserver(([entry]) => {
-      const width = Math.max(500, Math.floor(entry.contentRect.width));
-      const height = Math.max(510, Math.floor(entry.contentRect.height));
+      const width = Math.max(0, Math.floor(entry.contentRect.width));
+      const height = Math.max(0, Math.floor(entry.contentRect.height));
       setCanvasSize({ width, height });
     });
     observer.observe(stageRef.current);
@@ -1640,7 +1640,9 @@ export default function MainCanvas({
         );
         // Make sure selected node still exists in the freshly retrieved list
         setSelectedNodeId((current) =>
-          sortedNodes.some((node) => node.id === current) ? current : null,
+          sortedNodes.some((node) => String(node.id) === String(current))
+            ? current
+            : null,
         );
         setError("");
         setStatus("success");
@@ -1701,7 +1703,7 @@ export default function MainCanvas({
     [baseUrl, protocol],
   );
 
-  // Polls network status repeatedly using window.setInterval
+  // Poll after each refresh completes to avoid overlapping device requests.
   useEffect(() => {
     if (!baseUrl) {
       setStatus("idle");
@@ -1709,10 +1711,19 @@ export default function MainCanvas({
     }
     const controller = new AbortController();
     refresh(controller.signal);
-    const timer = window.setInterval(() => refresh(controller.signal), pollMs);
+    let stopped = false;
+    let timer;
+    const poll = async () => {
+      await refresh(controller.signal);
+      if (!stopped && !controller.signal.aborted) {
+        timer = window.setTimeout(poll, pollMs);
+      }
+    };
+    poll();
     return () => {
+      stopped = true;
       controller.abort();
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, [baseUrl, pollMs, refresh]);
 
@@ -2326,7 +2337,7 @@ export default function MainCanvas({
                   {/* Render all nodes on the topology */}
                   {displayedNodes.map((node) => {
                     const point = positions[node.id];
-                    const selected = node.id === selectedNodeId;
+                    const selected = String(node.id) === String(selectedNodeId);
                     const heterogeneousGroup =
                       heterogeneousGroupByNodeId[String(node.id)];
                     const nodeRadius = nodeRadiusForCount(

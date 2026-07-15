@@ -8,7 +8,7 @@ import ipAddressIcon from "../assets/status-icons/ip-address.png";
 import meshIdIcon from "../assets/status-icons/mesh_id.png";
 import rangeIcon from "../assets/status-icons/range.png";
 import rfModeIcon from "../assets/status-icons/rf-mode.png";
-import { requestJson as fetchJson } from "../api/deviceApi.js";
+import { buildDeviceUrl, requestJson as fetchJson } from "../api/deviceApi.js";
 import { useI18n } from "../i18n/index.js";
 
 /**
@@ -144,7 +144,10 @@ export default function TopStatusBar({
   onConfigShortcut,
 }) {
   const { t } = useI18n();
-  const baseUrl = useMemo(() => `http://${deviceIp}`, [deviceIp]);
+  const baseUrl = useMemo(
+    () => buildDeviceUrl(deviceIp, "").replace(/\/$/, ""),
+    [deviceIp],
+  );
   const fallbackConfig = useMemo(
     () => ({ ...MOCK_CONFIG, ip: deviceIp || MOCK_CONFIG.ip }),
     [deviceIp],
@@ -154,6 +157,8 @@ export default function TopStatusBar({
 
   useEffect(() => {
     const controller = new AbortController();
+    let stopped = false;
+    let timer;
     
     // Concurrent fetch logic pulling telemetry and settings from the hardware
     async function load() {
@@ -209,17 +214,22 @@ export default function TopStatusBar({
           rangeMode: rangeMode.rangeMode ?? "",
           dataEncryptionMode: encryption.dataEncryptionMode ?? 0,
         });
-      } catch {
-        // Fallback to initial mock parameters on connectivity error
-        setStatus(MOCK_STATUS);
-        setConfig(fallbackConfig);
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        // Preserve last-known-good values while the status indicator reports
+        // the connection problem instead of showing mock device data.
+        setStatus({ nodeNumber: 0, devices: [], configUpdated: false });
       }
     }
-    load();
-    const timer = setInterval(load, pollMs);
+    const poll = async () => {
+      await load();
+      if (!stopped && !controller.signal.aborted) timer = setTimeout(poll, pollMs);
+    };
+    poll();
     return () => {
+      stopped = true;
       controller.abort();
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, [baseUrl, fallbackConfig, pollMs]);
 

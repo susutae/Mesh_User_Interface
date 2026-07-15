@@ -1,10 +1,13 @@
 const DEFAULT_TIMEOUT_MS = 8000;
 
 export function buildDeviceUrl(deviceIp, path) {
+  const protocol = typeof window !== "undefined" && window.location.protocol === "https:"
+    ? "https:"
+    : "http:";
   const normalizedPath = String(path || "").startsWith("/")
     ? path
     : `/${path}`;
-  return `http://${deviceIp}${normalizedPath}`;
+  return `${protocol}//${deviceIp}${normalizedPath}`;
 }
 
 function normalizeFetchOptions(options = {}) {
@@ -13,7 +16,7 @@ function normalizeFetchOptions(options = {}) {
 }
 
 export async function requestText(url, options = {}) {
-  const response = await fetch(url, normalizeFetchOptions(options));
+  const response = await fetchWithTimeout(url, normalizeFetchOptions(options));
   const text = await response.text();
   if (!response.ok) {
     throw new Error(text || `Request failed: ${response.status}`);
@@ -22,9 +25,23 @@ export async function requestText(url, options = {}) {
 }
 
 export async function requestJson(url, options = {}) {
-  const response = await fetch(url, normalizeFetchOptions(options));
+  const response = await fetchWithTimeout(url, normalizeFetchOptions(options));
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return response.json();
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const normalized = normalizeFetchOptions(options);
+  const timeoutController = new AbortController();
+  const timer = window.setTimeout(() => timeoutController.abort(), timeoutMs);
+  const onAbort = () => timeoutController.abort();
+  normalized.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    return await fetch(url, { ...normalized, signal: timeoutController.signal });
+  } finally {
+    window.clearTimeout(timer);
+    normalized.signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 export async function postJson(url, payload, signal) {

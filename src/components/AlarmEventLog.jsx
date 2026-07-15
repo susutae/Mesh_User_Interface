@@ -412,8 +412,10 @@ export default function AlarmEventLog({
         if (requestError?.name === "AbortError") return;
         setError(requestError?.message || "Unable to retrieve alarm data.");
         setStatus("error");
-        addEvents([
-          {
+        const fingerprint = `Alarm Polling Error:${baseUrl}`;
+        if (!activeConditionsRef.current.has(fingerprint)) {
+          activeConditionsRef.current.add(fingerprint);
+          addEvents([{
             id: `${Date.now()}-alarm-poll-error`,
             timestamp: new Date().toISOString(),
             time: formatTimestamp(new Date()),
@@ -421,8 +423,8 @@ export default function AlarmEventLog({
             type: "Alarm Polling Error",
             source: baseUrl,
             detail: requestError?.message || "Unable to retrieve alarm data.",
-          },
-        ]);
+          }]);
+        }
       }
     },
     [addEvents, baseUrl, protocol],
@@ -435,10 +437,19 @@ export default function AlarmEventLog({
     }
     const controller = new AbortController();
     refresh(controller.signal);
-    const timer = window.setInterval(() => refresh(controller.signal), pollMs);
+    let stopped = false;
+    let timer;
+    const poll = async () => {
+      await refresh(controller.signal);
+      if (!stopped && !controller.signal.aborted) {
+        timer = window.setTimeout(poll, pollMs);
+      }
+    };
+    poll();
     return () => {
+      stopped = true;
       controller.abort();
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, [baseUrl, pollMs, refresh]);
 

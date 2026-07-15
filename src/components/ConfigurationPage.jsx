@@ -880,21 +880,38 @@ export default function ConfigurationPage({
     };
   }, [pendingApplyEntries, t]);
 
+  function assertConfigPostAccepted(result, key) {
+    if (!result || typeof result !== "object") return;
+    const errorText = [
+      result.error,
+      result.errors,
+      result.message,
+      result.result,
+    ]
+      .filter((value) => typeof value === "string")
+      .join(" ");
+    if (/invalid|error|fail|reject/i.test(errorText)) {
+      throw new Error(`${key}: ${errorText}`);
+    }
+  }
+
   async function postConfigEntries(entries, applyGlobally, signal) {
     if (applyGlobally) {
-      await postJson(
+      const result = await postJson(
         `${baseUrl}/config?content=configGlobal`,
         { configGlobal: true },
         signal,
       );
+      assertConfigPostAccepted(result, "configGlobal");
     }
 
     for (const { key, value } of entries) {
-      await postJson(
+      const result = await postJson(
         `${baseUrl}/config?content=${encodeURIComponent(key)}`,
         { [key]: value },
         signal,
       );
+      assertConfigPostAccepted(result, key);
     }
   }
 

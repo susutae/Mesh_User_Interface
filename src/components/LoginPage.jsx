@@ -19,7 +19,7 @@ import LogoMark from "./LogoMark.jsx";
 import { postForm } from "../api/deviceApi.js";
 import { useI18n } from "../i18n/index.js";
 
-const WEBUI_VERSION = "0.1.17-dev";
+const WEBUI_VERSION = "0.1.18-dev";
 
 /**
  * LoginPage Component

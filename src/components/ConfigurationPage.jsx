@@ -896,23 +896,15 @@ export default function ConfigurationPage({
   }
 
   async function postConfigEntries(entries, applyGlobally, signal) {
-    if (applyGlobally) {
-      const result = await postJson(
-        `${baseUrl}/config?content=configGlobal`,
-        { configGlobal: true },
-        signal,
-      );
-      assertConfigPostAccepted(result, "configGlobal");
-    }
-
-    for (const { key, value } of entries) {
-      const result = await postJson(
-        `${baseUrl}/config?content=${encodeURIComponent(key)}`,
-        { [key]: value },
-        signal,
-      );
-      assertConfigPostAccepted(result, key);
-    }
+    // Global (*) settings must be posted with configGlobal=true in the same
+    // /config request. A separate configGlobal request does not fan out the
+    // following parameter updates to the remote nodes.
+    const payload = {
+      ...Object.fromEntries(entries.map(({ key, value }) => [key, value])),
+      ...(applyGlobally ? { configGlobal: true } : {}),
+    };
+    const result = await postJson(`${baseUrl}/config`, payload, signal);
+    assertConfigPostAccepted(result, applyGlobally ? "configGlobal" : "config");
   }
 
   const configurationSearchResults = useMemo(() => {

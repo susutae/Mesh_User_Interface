@@ -15,6 +15,7 @@ const dictionaries = {
       label: "Language",
       english: "English",
       chinese: "中文",
+      traditionalChinese: "繁體中文（台灣）",
       arabic: "العربية",
       spanish: "Español",
       indonesian: "Bahasa Indonesia",
@@ -1064,6 +1065,15 @@ const dictionaries = {
       hideSnr: "Hide SNR",
       showSnr: "Show SNR",
       coverageOverlay: "Coverage Overlay",
+      coverageRfEstimate: "RF estimate",
+      calibratedFixedView: "Calibrated snapshot",
+      presetLocation: "Preset Location",
+      exitPresetMode: "Exit Preset",
+      measureDistance: "Measure Distance",
+      cancelMeasure: "Cancel Measure",
+      clearMeasure: "Clear Measure",
+      measureNextPoint: "Select the second point",
+      measureResult: "Distance: {distance}",
       coverageRadiusKm: "Radius (km)",
       coverageOpacity: "Opacity",
       coverageLegendTitle: "Coverage overlay",
@@ -1233,6 +1243,7 @@ const dictionaries = {
       label: "语言",
       english: "English",
       chinese: "中文",
+      traditionalChinese: "繁體中文（台灣）",
       arabic: "العربية",
       spanish: "Español",
       indonesian: "Bahasa Indonesia",
@@ -2224,6 +2235,15 @@ const dictionaries = {
       hideSnr: "隐藏 SNR",
       showSnr: "显示 SNR",
       coverageOverlay: "覆盖范围叠加",
+      coverageRfEstimate: "射频估算",
+      calibratedFixedView: "已校准快照",
+      presetLocation: "预设位置",
+      exitPresetMode: "退出预设",
+      measureDistance: "测量距离",
+      cancelMeasure: "取消测量",
+      clearMeasure: "清除测量",
+      measureNextPoint: "请选择第二个点",
+      measureResult: "距离：{distance}",
       coverageRadiusKm: "半径 (km)",
       coverageOpacity: "透明度",
       coverageLegendTitle: "覆盖范围叠加",
@@ -2377,11 +2397,46 @@ const dictionaries = {
   },
 };
 
+const zhTwCharacterMap = {
+  语: "語", 言: "言", 体: "體", 现: "現", 视: "視", 图: "圖", 标: "標", 题: "題",
+  设: "設", 网: "網", 络: "絡", 节: "節", 点: "點", 频: "頻", 声: "聲", 热: "熱",
+  盖: "蓋", 范: "範", 围: "圍", 叠: "疊", 载: "載", 录: "錄", 统: "統", 计: "計",
+  变: "變", 导: "導", 复: "復", 试: "試", 验: "驗", 证: "證", 认: "認", 确: "確",
+  消: "消", 除: "除", 清: "清", 存: "存", 发: "發", 读: "讀", 写: "寫", 关: "關",
+  闭: "閉", 开: "開", 启: "啟", 选: "選", 择: "擇", 览: "覽", 状: "狀", 态: "態",
+  连: "連", 断: "斷", 电: "電", 备: "備", 讯: "訊", 码: "碼", 权: "權", 许: "許",
+  书: "書", 传: "傳", 输: "輸", 线: "線", 预: "預", 测: "測", 误: "誤", 严: "嚴",
+  无: "無", 资: "資", 级: "級", 别: "別", 单: "單", 组: "組", 进: "進", 处: "處",
+  动: "動", 时: "時", 间: "間", 轻: "輕", 湾: "灣", 台: "臺", 讯: "訊", 实: "實",
+  证: "證", 够: "夠", 结: "結", 构: "構", 类: "類", 备: "備", 这: "這", 个: "個",
+  门: "門", 问: "問", 题: "題", 还: "還", 过: "過", 远: "遠", 处: "處", 仅: "僅",
+};
+
+function traditionalize(value) {
+  if (typeof value === "string") {
+    return [...value].map((character) => zhTwCharacterMap[character] || character).join("");
+  }
+  if (Array.isArray(value)) return value.map(traditionalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, traditionalize(item)]));
+  }
+  return value;
+}
+
+dictionaries.zhTW = traditionalize(dictionaries.zh);
+dictionaries.zhTW = mergeDictionaries(dictionaries.zhTW, {
+  language: {
+    label: "語言",
+    chinese: "繁體中文（台灣）",
+  },
+});
+
 dictionaries.ar = mergeDictionaries(dictionaries.en, {
   language: {
     label: "اللغة",
     english: "English",
     chinese: "中文",
+    traditionalChinese: "繁體中文（台灣）",
     arabic: "العربية",
     spanish: "Español",
     indonesian: "Bahasa Indonesia",
@@ -3244,6 +3299,15 @@ dictionaries.ar = mergeDictionaries(dictionaries.en, {
     hideSnr: "إخفاء SNR",
     showSnr: "إظهار SNR",
     coverageOverlay: "تراكب التغطية",
+    coverageRfEstimate: "تقدير RF",
+    calibratedFixedView: "لقطة معايرة",
+    presetLocation: "موقع مسبق",
+    exitPresetMode: "الخروج من الإعداد المسبق",
+    measureDistance: "قياس المسافة",
+    cancelMeasure: "إلغاء القياس",
+    clearMeasure: "مسح القياس",
+    measureNextPoint: "حدد النقطة الثانية",
+    measureResult: "المسافة: {distance}",
     coverageRadiusKm: "نصف القطر (كم)",
     coverageOpacity: "الشفافية",
     coverageLegendTitle: "تراكب التغطية",
@@ -3483,6 +3547,7 @@ dictionaries.es = mergeDictionaries(dictionaries.en, {
     label: "Idioma",
     english: "English",
     chinese: "中文",
+    traditionalChinese: "繁體中文（台灣）",
     arabic: "العربية",
     spanish: "Español",
     indonesian: "Bahasa Indonesia",
@@ -4250,6 +4315,15 @@ dictionaries.es = mergeDictionaries(dictionaries.en, {
     hideSnr: "Ocultar SNR",
     showSnr: "Mostrar SNR",
     coverageOverlay: "Superposición de cobertura",
+    coverageRfEstimate: "Estimación de RF",
+    calibratedFixedView: "Captura calibrada",
+    presetLocation: "Ubicación predefinida",
+    exitPresetMode: "Salir del preajuste",
+    measureDistance: "Medir distancia",
+    cancelMeasure: "Cancelar medición",
+    clearMeasure: "Borrar medición",
+    measureNextPoint: "Seleccione el segundo punto",
+    measureResult: "Distancia: {distance}",
     coverageRadiusKm: "Radio (km)",
     coverageOpacity: "Opacidad",
     coverageLegendTitle: "Superposición de cobertura",
@@ -4458,6 +4532,7 @@ dictionaries.id = mergeDictionaries(dictionaries.en, {
     label: "Bahasa",
     english: "English",
     chinese: "中文",
+    traditionalChinese: "繁體中文（台灣）",
     arabic: "العربية",
     spanish: "Español",
     indonesian: "Bahasa Indonesia",
@@ -5257,6 +5332,15 @@ dictionaries.id = mergeDictionaries(dictionaries.en, {
     hideSnr: "Sembunyikan SNR",
     showSnr: "Tampilkan SNR",
     coverageOverlay: "Overlay cakupan",
+    coverageRfEstimate: "Estimasi RF",
+    calibratedFixedView: "Snapshot terkalibrasi",
+    presetLocation: "Lokasi preset",
+    exitPresetMode: "Keluar dari preset",
+    measureDistance: "Ukur jarak",
+    cancelMeasure: "Batalkan pengukuran",
+    clearMeasure: "Hapus pengukuran",
+    measureNextPoint: "Pilih titik kedua",
+    measureResult: "Jarak: {distance}",
     coverageRadiusKm: "Radius (km)",
     coverageOpacity: "Opasitas",
     coverageLegendTitle: "Overlay cakupan",
@@ -5498,7 +5582,7 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, activeLanguage);
     document.documentElement.lang =
-      activeLanguage === "zh" ? "zh-CN" : activeLanguage;
+      activeLanguage === "zh" ? "zh-CN" : activeLanguage === "zhTW" ? "zh-TW" : activeLanguage;
     document.documentElement.dir = activeLanguage === "ar" ? "rtl" : "ltr";
   }, [activeLanguage]);
 
@@ -5522,6 +5606,7 @@ export function LanguageProvider({ children }) {
       languages: [
         { value: "en", label: dictionaries[activeLanguage].language.english },
         { value: "zh", label: dictionaries[activeLanguage].language.chinese },
+        { value: "zhTW", label: dictionaries[activeLanguage].language.traditionalChinese },
         { value: "ar", label: dictionaries[activeLanguage].language.arabic },
         { value: "es", label: dictionaries[activeLanguage].language.spanish },
         { value: "id", label: dictionaries[activeLanguage].language.indonesian },

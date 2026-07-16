@@ -245,15 +245,15 @@ function toRadians(value) {
   return (Number(value) * Math.PI) / 180;
 }
 
-function distanceKmBetweenNodes(fromNode, toNode) {
+export function distanceKmBetweenCoordinates(fromPoint, toPoint) {
   const earthRadiusKm = 6371;
-  const fromLatitude = toRadians(fromNode.latitude);
-  const toLatitude = toRadians(toNode.latitude);
+  const fromLatitude = toRadians(fromPoint.latitude ?? fromPoint.y);
+  const toLatitude = toRadians(toPoint.latitude ?? toPoint.y);
   const latitudeDelta = toRadians(
-    Number(toNode.latitude) - Number(fromNode.latitude),
+    Number(toPoint.latitude ?? toPoint.y) - Number(fromPoint.latitude ?? fromPoint.y),
   );
   const longitudeDelta = toRadians(
-    Number(toNode.longitude) - Number(fromNode.longitude),
+    Number(toPoint.longitude ?? toPoint.x) - Number(fromPoint.longitude ?? fromPoint.x),
   );
   const haversine =
     Math.sin(latitudeDelta / 2) ** 2 +
@@ -265,6 +265,10 @@ function distanceKmBetweenNodes(fromNode, toNode) {
     2 *
     Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
   );
+}
+
+function distanceKmBetweenNodes(fromNode, toNode) {
+  return distanceKmBetweenCoordinates(fromNode, toNode);
 }
 
 export function formatRange(distanceKm) {

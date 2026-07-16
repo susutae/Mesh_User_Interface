@@ -23,9 +23,11 @@ export function useMaptalksMap({
   coverageEnabled = false,
   coverageOpacity = 0.22,
   coveragePoints = [],
+  measurePoints = [],
   layer,
   linkQuality,
   onPresetCoordinate,
+  onMeasureCoordinate,
   onSetLayer,
   presetDraft,
   selectedNode,
@@ -43,6 +45,8 @@ export function useMaptalksMap({
   const markerLayerRef = useRef(null);
   const presetLayerRef = useRef(null);
   const presetCoordinateRef = useRef(onPresetCoordinate);
+  const measureCoordinateRef = useRef(onMeasureCoordinate);
+  const measurementLayerRef = useRef(null);
   const validNodeSignature = validNodes.map((node) => node.id).join("|");
   const [zoom, setZoom] = useState(13);
   const [hasAutoFitted, setHasAutoFitted] = useState(false);
@@ -50,6 +54,10 @@ export function useMaptalksMap({
   useEffect(() => {
     presetCoordinateRef.current = onPresetCoordinate;
   }, [onPresetCoordinate]);
+
+  useEffect(() => {
+    measureCoordinateRef.current = onMeasureCoordinate;
+  }, [onMeasureCoordinate]);
 
   const fitMapToNodes = useCallback(
     (nodesToFit = validNodes) => {
@@ -190,9 +198,15 @@ export function useMaptalksMap({
     presetLayerRef.current = new maptalks.VectorLayer("gps-preset", {
       zIndex: 4,
     }).addTo(map);
+    measurementLayerRef.current = new maptalks.VectorLayer("distance-measurement", {
+      zIndex: 5,
+    }).addTo(map);
 
     map.on("zoomend", () => setZoom(map.getZoom()));
-    map.on("click", (event) => presetCoordinateRef.current?.(event.coordinate));
+    map.on("click", (event) => {
+      presetCoordinateRef.current?.(event.coordinate);
+      measureCoordinateRef.current?.(event.coordinate);
+    });
     mapRef.current = map;
 
     return () => {
@@ -202,6 +216,7 @@ export function useMaptalksMap({
       linkLayerRef.current = null;
       markerLayerRef.current = null;
       presetLayerRef.current = null;
+      measurementLayerRef.current = null;
     };
   }, []);
 
@@ -334,6 +349,46 @@ export function useMaptalksMap({
     );
     layerRef.addGeometry(marker);
   }, [presetDraft, t]);
+
+  useEffect(() => {
+    const layerRef = measurementLayerRef.current;
+    if (!layerRef) return;
+
+    layerRef.clear();
+    if (suppressVectors || !measurePoints.length) return;
+
+    const points = measurePoints.map((point) => [Number(point.x), Number(point.y)]);
+    const markers = measurePoints.map(
+      (point, index) =>
+        new maptalks.Marker([Number(point.x), Number(point.y)], {
+          symbol: {
+            markerType: "ellipse",
+            markerFill: "#f97316",
+            markerLineColor: "#fff7ed",
+            markerLineWidth: 2,
+            markerWidth: 16,
+            markerHeight: 16,
+            textName: String(index + 1),
+            textFill: "#fff7ed",
+            textSize: 9,
+            textWeight: "bold",
+          },
+        }),
+    );
+    layerRef.addGeometry(markers);
+    if (points.length === 2) {
+      layerRef.addGeometry(
+        new maptalks.LineString(points, {
+          symbol: {
+            lineColor: "#f97316",
+            lineWidth: 3,
+            lineOpacity: 0.92,
+            lineDasharray: [8, 5],
+          },
+        }),
+      );
+    }
+  }, [measurePoints, suppressVectors]);
 
   useEffect(() => {
     const map = mapRef.current;

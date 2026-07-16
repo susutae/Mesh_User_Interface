@@ -7,6 +7,9 @@ export default function MapToolbar({
   coverageUseRfEstimate = true,
   coverageOpacity = 0.22,
   coverageRadiusKm = 3,
+  measureDistanceKm = null,
+  measurementMode = false,
+  measurementPoints = [],
   isCalibratedOffline = false,
   layer,
   mapManagementOpen,
@@ -23,6 +26,8 @@ export default function MapToolbar({
   onSetCoverageUseRfEstimate,
   onSetCoverageOpacity,
   onSetCoverageRadiusKm,
+  onSetMeasurementMode,
+  onClearMeasurement,
   onSetLayer,
   onSetMapManagementOpen,
   onSetPresetMode,
@@ -94,6 +99,32 @@ export default function MapToolbar({
       )}
 
       <div className="tools-map-toolbar-actions">
+        <button
+          type="button"
+          className={measurementMode ? "active" : ""}
+          onClick={() => onSetMeasurementMode((current) => !current)}
+        >
+          {measurementMode
+            ? t("map.cancelMeasure", "Cancel Measure")
+            : t("map.measureDistance", "Measure Distance")}
+        </button>
+        {measurementPoints.length > 0 && (
+          <button type="button" onClick={onClearMeasurement}>
+            {t("map.clearMeasure", "Clear Measure")}
+          </button>
+        )}
+        {measurementPoints.length === 1 && (
+          <span className="tools-map-measure-status">
+            {t("map.measureNextPoint", "Select the second point")}
+          </span>
+        )}
+        {measurementPoints.length === 2 && Number.isFinite(measureDistanceKm) && (
+          <span className="tools-map-measure-result">
+            {t("map.measureResult", "Distance: {distance}", {
+              distance: formatMeasurementDistance(measureDistanceKm),
+            })}
+          </span>
+        )}
         <label className="tools-map-coverage-toggle">
           <input
             type="checkbox"
@@ -214,4 +245,9 @@ export default function MapToolbar({
       </div>
     </div>
   );
+}
+
+function formatMeasurementDistance(distanceKm) {
+  if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
+  return `${distanceKm.toFixed(2)} km`;
 }

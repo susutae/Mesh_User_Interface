@@ -36,6 +36,7 @@ import {
   OFFLINE_MAP_VIEW_KEY,
   buildRangeSummary,
   createOfflineCalibration,
+  distanceKmBetweenCoordinates,
   formatAltitude,
   formatCoord,
   getBestSnrBetweenNodes,
@@ -208,6 +209,8 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
   );
   const [offlineMessage, setOfflineMessage] = useState("");
   const [mapManagementOpen, setMapManagementOpen] = useState(false);
+  const [measurementMode, setMeasurementMode] = useState(false);
+  const [measurementPoints, setMeasurementPoints] = useState([]);
   const [calibrationMode, setCalibrationMode] = useState(false);
   const [calibrationDraft, setCalibrationDraft] = useState([]);
   const [calibrationPoint, setCalibrationPoint] = useState(null);
@@ -331,6 +334,10 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
     selectedNode && isCoordinateValid(selectedNode)
       ? selectedNode
       : validNodes[0] || DEFAULT_MAP_CENTER;
+  const measureDistanceKm = useMemo(() => {
+    if (measurementPoints.length !== 2) return null;
+    return distanceKmBetweenCoordinates(measurementPoints[0], measurementPoints[1]);
+  }, [measurementPoints]);
   
 
   useEffect(() => {
@@ -358,6 +365,13 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
       if (!presetModeRef.current) return;
       buildPresetDraft(coordinate, "map");
     },
+    onMeasureCoordinate: (coordinate) => {
+      if (!measurementMode) return;
+      setMeasurementPoints((current) =>
+        current.length >= 2 ? [current[1], coordinate] : [...current, coordinate],
+      );
+    },
+    measurePoints: measurementPoints,
     onSetLayer: setLayer,
     presetDraft,
     selectedNode,
@@ -368,6 +382,11 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
     t,
     validNodes,
   });
+
+  function clearMeasurement() {
+    setMeasurementPoints([]);
+    setMeasurementMode(false);
+  }
 
   const externalMapUrl = `https://www.openstreetmap.org/?mlat=${mapCenter.latitude}&mlon=${mapCenter.longitude}#map=${zoom}/${mapCenter.latitude}/${mapCenter.longitude}`;
 
@@ -800,6 +819,9 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
               coverageUseRfEstimate={coverageUseRfEstimate}
               coverageOpacity={normalisedCoverageOpacity}
               coverageRadiusKm={normalisedCoverageRadiusKm}
+              measureDistanceKm={measureDistanceKm}
+              measurementMode={measurementMode}
+              measurementPoints={measurementPoints}
               externalMapUrl={externalMapUrl}
               isCalibratedOffline={isCalibratedOffline}
               layer={layer}
@@ -826,14 +848,28 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
               onSetCoverageUseRfEstimate={setCoverageUseRfEstimate}
               onSetCoverageOpacity={setCoverageOpacity}
               onSetCoverageRadiusKm={setCoverageRadiusKm}
+              onSetMeasurementMode={(updater) => {
+                const nextMode =
+                  typeof updater === "function" ? updater(measurementMode) : updater;
+                setMeasurementMode(nextMode);
+                setMeasurementPoints([]);
+                if (nextMode) setPresetMode(false);
+              }}
+              onClearMeasurement={clearMeasurement}
               onSetLayer={(nextLayer) => {
                 setLayer(nextLayer);
                 window.requestAnimationFrame(() => fitMapToNodes());
               }}
               onSetMapManagementOpen={setMapManagementOpen}
               onSetPresetMode={(updater) => {
-                setPresetMode(updater);
+                const nextMode =
+                  typeof updater === "function" ? updater(presetMode) : updater;
+                setPresetMode(nextMode);
                 setPresetStatus("");
+                if (nextMode) {
+                  setMeasurementMode(false);
+                  setMeasurementPoints([]);
+                }
               }}
               onSetShowSnrLinks={setShowSnrLinks}
               onZoomIn={zoomIn}

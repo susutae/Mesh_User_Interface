@@ -726,10 +726,6 @@ function NodeList({
         {nodes.map((node) => {
           const selected = node.id === selectedId;
           const displayed = displayedNodeIds.has(node.id);
-          const utilisation = Math.max(
-            0,
-            Math.min(1, Number(node.resourceRatio) || 0),
-          );
           return (
             <button
               type="button"
@@ -819,11 +815,12 @@ function NodeList({
                 </label>
               </div>
 
-              {/* Node details: Name, IP, Resource utilization */}
+              {/* Keep the online list focused on identity. Resource use is shown
+                  in the selected node information card. */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr",
+                  gridTemplateColumns: "1fr 1fr",
                   gap: "var(--topology-card-gap)",
                   marginTop: 8,
                 }}
@@ -876,48 +873,6 @@ function NodeList({
                     {node.ip || t("monitor.unavailable", "Unavailable")}
                   </div>
                 </div>
-                <div>
-                  <div
-                    style={{
-                      color: "var(--muted)",
-                      fontSize: "var(--topology-label-font)",
-                      fontWeight: 800,
-                      letterSpacing: ".06em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {t("monitor.resource", "Resource")}
-                  </div>
-                  <div
-                    style={{
-                      color: "var(--text)",
-                      fontSize: "var(--topology-value-font)",
-                      fontWeight: 650,
-                    }}
-                  >
-                    {Math.round(utilisation * 100)}%
-                  </div>
-                </div>
-              </div>
-
-              {/* Resource utilization bar */}
-              <div
-                style={{
-                  height: 3,
-                  background: "rgba(148,163,184,0.16)",
-                  borderRadius: 99,
-                  marginTop: 9,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${utilisation * 100}%`,
-                    borderRadius: 99,
-                    background: utilisation > 0.8 ? "#fb923c" : "#48B9D3",
-                  }}
-                />
               </div>
             </button>
           );
@@ -1224,10 +1179,31 @@ function DetailsCard({
           <Metric label={t("monitor.nodeId", "Node ID")} value={`#${node.id}`} accent />
           <Metric label={t("monitor.nodeName", "Node name")} value={node.name} />
           <Metric label={t("monitor.ipAddress", "IP address")} value={node.ip || "--"} />
-          <Metric
-            label={t("monitor.resourceUse", "Resource use")}
-            value={`${Math.round((Number(node.resourceRatio) || 0) * 100)}%`}
-          />
+          <div className="node-resource-metric">
+            <Metric
+              label={t("monitor.resourceUse", "Resource use")}
+              value={`${Math.round((Number(node.resourceRatio) || 0) * 100)}%`}
+            />
+            <div
+              className="node-resource-bar"
+              role="progressbar"
+              aria-label={t("monitor.resourceUse", "Resource use")}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={Math.round(
+                Math.max(0, Math.min(1, Number(node.resourceRatio) || 0)) * 100,
+              )}
+            >
+              <span
+                style={{
+                  width: `${Math.max(
+                    0,
+                    Math.min(1, Number(node.resourceRatio) || 0),
+                  ) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <Divider />

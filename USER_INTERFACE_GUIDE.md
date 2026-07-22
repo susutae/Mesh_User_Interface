@@ -63,7 +63,8 @@ Use the **Language** selector on the login page to switch the interface language
 Language support includes:
 
 - **English**
-- **Chinese**
+- **Simplified Chinese**
+- **Traditional Chinese (Taiwan)**
 - **Arabic**
 - **Spanish**
 - **Bahasa Indonesia**
@@ -166,7 +167,6 @@ The Nodes Online panel lists online nodes with:
 - Node ID
 - Node name
 - IP address
-- Resource usage
 - Show checkbox
 
 Use this panel to control which nodes are displayed on the topology canvas.
@@ -227,12 +227,14 @@ Click a node in topology view to display Node Information.
 
 The card includes:
 
-- **Identity**: Node ID, Node Name, IP Address, Resource Use
+- **Identity**: Node ID, Node Name, IP Address, and a Resource Use bar scaled from 0% to 100%
 - **Telemetry**: Latitude, Longitude, Altitude, FPGA Temperature, Receive, Transmit
 - **Heterogeneous Link**: related heterogeneous link group and nodes
 - **Receiving Links**: source nodes, SNR, range, and quality
 
-Close the card using the `x` button.
+Receive and Transmit are displayed in Mbps. The byte-rate values reported by the device are converted using `(bytes per second x 8) / 1,000,000`.
+
+Use **Pin** to keep the card open while inspecting the canvas. The card body is independently scrollable when its content exceeds the available viewport. Close it using the `x` button.
 
 Node Information is positioned so it does not block the main topology control buttons. Use the close button after inspection. If the operator needs to compare information while changing views, the card can remain open while switching between Topology and Matrix.
 
@@ -373,8 +375,11 @@ RF Expert includes:
 - Custom Modulation
 - Disconnect Nodes
 - RF Switch
+- Broadcast to Silent
 
 Some RF options appear only when the required license is available.
+
+The Frequency and TX Frequency fields use separate lists. Open the relevant **Manage** window to add, remove, import, or export `freqList` and `freqListTx` values. When **Update All Nodes** is enabled, a modified global frequency list is posted as the complete list, not only as the newly added or removed entry.
 
 ### Network Configuration
 
@@ -501,30 +506,27 @@ Tools tabs:
 
 ### Spectrum
 
-Spectrum displays RSSI information by frequency.
+Spectrum provides a real-time frequency-domain view of RSSI conditions.
 
 It shows:
 
 - Frequency samples
 - Online nodes
 - AI Assistant recommendation
-- RSSI graph
+- Real-time spectrum graph
+- Best Channel Ranking
 - Node checkboxes
 - RSSI view options such as Average, Antenna 1, and Antenna 2
+- Live controls for start/pause, refresh rate, peak hold, clear, refresh, and export
 
 The graph uses:
 
 - X-axis: frequency in MHz
 - Y-axis: RSSI level in dBm
 
-Hover over a frequency point to view:
+The graph displays average noise RSSI, burst interference RSSI, retained peaks when Peak Hold is enabled, and selected node/antenna traces. A current-frequency marker identifies the configured operating channel.
 
-- Frequency point
-- Average Noise RSSI
-- Burst Interference RSSI
-- Burst %
-
-The AI Assistant recommends a frequency based on lower average noise, lower burst interference, and lower burst percentage.
+The **Best Channel Ranking** compares candidate frequencies by average noise, burst RSSI, and burst percentage. The AI Assistant recommends the strongest candidate and provides alternate frequencies. Use **Export** to preserve the current spectrum data for later analysis.
 
 ### Maptalks
 
@@ -534,6 +536,7 @@ Features:
 
 - Roadmap, terrain, satellite, hybrid, and offline image layers
 - Zoom controls
+- Manual point-to-point distance measurement
 - Refresh
 - View All
 - Recenter
@@ -543,7 +546,8 @@ Features:
 - Save View
 - Load Saved
 - Show / Hide SNR links
-- Coverage Overlay with user-defined radius and opacity
+- Coverage Overlay estimated from each node's configured RF frequency and output power
+- Coverage Planner for simulated node placement
 
 Node behavior:
 
@@ -556,16 +560,52 @@ Node behavior:
 Nodes Online side panel:
 
 - Shows mapped node count, Node ID, and Node Name.
-- Includes a compact **Range Summary** when at least two nodes have valid coordinates.
-- The Range Summary shows the nearest node pair and the average distance across mapped nodes.
-- If no valid coordinates are available, the panel shows an empty-state message instead of a large assistant card.
+- Includes a compact **AI Assistant / Node Insights** summary when valid coordinates are available.
+- Node Insights reports GPS validity, the nearest node pair, and average distance across mapped nodes.
+- While Coverage Planner is active, the same panel adds **Planner Coverage Analysis** for the simulated layout.
+- If no valid coordinates are available, the panel shows a concise empty-state message.
 
 Coverage overlay:
 
-- Enable **Coverage Overlay** to draw a coverage radius around each mapped node.
-- Set the radius in kilometers using the Radius field.
-- Adjust overlay visibility using the Opacity slider.
+- Enable **Coverage Overlay** to draw an estimated coverage radius around each mapped node.
+- The estimate uses that node's configured RF frequency and output power.
 - Overlapping coverage areas appear stronger, helping users identify shared coverage regions.
+- The overlay is a planning estimate and must not be treated as measured coverage.
+
+Coverage Planner:
+
+Coverage Planner is a simulation tool for estimating how many nodes may be needed to cover a circular target area. Planned nodes are separate from live online nodes and do not change device configuration.
+
+1. Open **Coverage Planner** from the Maptalks toolbar.
+2. Click **Set Area Center**, then select the center of the required coverage area on the map.
+3. Enter the operating **Frequency MHz**, **TX Power dBm**, and **Target area km**.
+4. Review the estimated node coverage radius and planned-node count.
+5. Click **Auto Place** to generate an overlapping placement pattern inside the target boundary, or click **Place Node** and select individual locations manually.
+6. Use **Clear Plan** to remove all simulated nodes, or **Export Plan** to download the current plan.
+7. Click **Exit Planner** to return to normal live-node map operation.
+
+Planned nodes use labels such as `P1`, `P2`, and `P3`. Dashed amber circles represent their estimated coverage. The automatic placement pattern keeps planned node centers within the selected target area and uses overlap between neighboring coverage circles to reduce gaps.
+
+The Planner Coverage Analysis in the right-side AI Assistant summarizes:
+
+- Planned node count
+- Target-area radius
+- Estimated radius per node
+- Whether the simulated layout reaches the target boundary
+- A reminder to verify terrain, obstructions, antenna characteristics, and link budget before deployment
+
+The estimate is an initial planning aid, not a guarantee of RF coverage. Actual range can be reduced by terrain, buildings, foliage, interference, antenna height, cable loss, receiver sensitivity, modulation, and regulatory power limits. Validate the exported plan with a link-budget calculation and an on-site survey before deployment.
+
+Distance measurement:
+
+- Click **Measure Distance**, then select two map points.
+- The map draws the measurement line and displays the calculated ground distance.
+- Use **Clear Measure** to remove the measurement.
+
+Preset location:
+
+- **Preset Location** assigns latitude, longitude, and altitude to a selected node.
+- Review the old and new GPS values in the Review Changes dialog before applying them to the device.
 
 SNR links:
 
@@ -579,6 +619,9 @@ Offline map:
 - **Download Offline** exports the current offline package.
 - **Save View** saves the current view in the browser.
 - **Load Saved** restores the saved browser view.
+- A plain uploaded image is an offline snapshot and does not contain geographic coordinates by itself.
+- Use three-point calibration to associate image points with map coordinates when nodes must align with an offline image.
+- A calibrated `.agilmap` package preserves the image and its calibration/bounds metadata for true offline positioning.
 
 ### Link Margin
 
@@ -647,13 +690,15 @@ When no result is available, the Live Results area displays a simple placeholder
 
 - Average UDP throughput
 - Samples
-- Jitter
-- Loss
 - Datagrams
+- Client bandwidth in Mbits/sec
+- Server bandwidth in Mbits/sec
+- Target bandwidth and throughput-versus-target progress
+- Loss and jitter
 - Server result text
 - Client result text
 
-The AI Assistant summary appears inside the Live Results area after result data is available.
+The AI Assistant summary appears inside the Live Results area after result data is available. It compares server-received throughput with the target, evaluates loss and jitter, distinguishes a complete successful test from warning/error text, and suggests relevant checks such as server status, node addresses, UDP port, session ID, or a lower requested bandwidth.
 
 Server and client result panes are retained in the browser after leaving and returning to the IPERF tab. Use **Clear Results** to remove the saved IPERF results.
 
@@ -787,7 +832,7 @@ On smaller screens:
 
 Language behavior:
 
-- English, Chinese, Arabic, Spanish, and Bahasa Indonesia are available from the language selector.
+- English, Simplified Chinese, Traditional Chinese (Taiwan), Arabic, Spanish, and Bahasa Indonesia are available from the language selector.
 - Arabic uses right-to-left layout where appropriate.
 - Technical values, endpoint-derived values, IP addresses, node IDs, and units remain readable in their original format.
 - Some device-returned option values may remain in English when they are firmware-defined values.

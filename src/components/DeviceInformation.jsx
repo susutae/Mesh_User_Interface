@@ -267,6 +267,11 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
     () => `${protocol}://${deviceIp}`.replace(/\/$/, ""),
     [deviceIp, protocol],
   );
+  const firmwareUploadUrl = useMemo(() => {
+    const url = new URL("/upload", baseUrl);
+    url.port = "8080";
+    return url.toString();
+  }, [baseUrl]);
   const loadingText = t("common.loading", "Loading...");
   const unavailableText = t("deviceInfo.unavailable", "Unavailable");
   const infoRowText = { loadingText, unavailableText };
@@ -336,6 +341,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
    * @param {Object} options - Upload options
    * @param {string} options.label - Package label for display
    * @param {React.RefObject} options.inputRef - Reference to clear file input
+   * @param {string} [options.uploadUrl] - Override for the package upload endpoint
    */
   async function uploadPackageAndUpdate(file, options) {
     if (!file) return;
@@ -364,11 +370,14 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
     let requestStage = "upload";
     try {
       // Step 1: Upload the package
-      const uploadText = await fetchText(`${baseUrl}/upload`, {
-        method: "POST",
-        body: form,
-        timeoutMs: PACKAGE_UPLOAD_TIMEOUT_MS,
-      });
+      const uploadText = await fetchText(
+        options.uploadUrl || `${baseUrl}/upload`,
+        {
+          method: "POST",
+          body: form,
+          timeoutMs: PACKAGE_UPLOAD_TIMEOUT_MS,
+        },
+      );
       if (!isOkResponse(uploadText)) {
         throw new Error(
           t(
@@ -463,6 +472,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
     uploadPackageAndUpdate(file, {
       label: t("deviceInfo.firmwarePackage", "firmware"),
       inputRef: firmwareInputRef,
+      uploadUrl: firmwareUploadUrl,
     });
   }
 

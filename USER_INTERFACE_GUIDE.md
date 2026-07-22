@@ -669,6 +669,7 @@ The Information page has two tabs:
 About displays:
 
 - ESN
+- Product Code
 - Maximum RF Output
 - Frequency Range
 - WebUI Version
@@ -678,6 +679,32 @@ Actions:
 
 - **Firmware Update**
 - **WebUI Update**
+
+#### Firmware Update
+
+Firmware packages must use the `.tar.gz` file format.
+
+1. Click **Firmware Update** and select the firmware package.
+2. Review the package name and confirm the warning. Do not power off, restart, or shut down the radio during the update.
+3. The Web UI uploads the package to `http://<device-ip>:8080/upload` as multipart form data using the form field `file`.
+4. After the upload service returns `OK`, the Web UI sends `GET http://<device-ip>/update` to start the upgrade.
+5. The upgrade request may take up to three minutes. `OK` indicates that the upgrade was accepted; `FAILED` indicates that it was unsuccessful.
+6. After a successful update, the device reboots automatically. Wait for it to return online, then use **Refresh** to verify the reported Firmware Version.
+
+If the browser closes, the network disconnects, or the request times out after the upgrade has started, do not immediately repeat the upgrade. The device continues the upgrade independently of the browser. Wait for the device to reboot and verify its current version. Re-upload the package only when the reported version confirms that the upgrade failed.
+
+Because the upload service uses port `8080`, it is a different browser origin from the normal Web UI. The device upload service must allow requests from the Web UI origin. A browser message such as **Failed to fetch** may indicate that port `8080` is unavailable or that its CORS policy does not allow the request.
+
+#### WebUI Update
+
+WebUI packages use the `.zip` file format and follow a separate flow from firmware:
+
+1. Click **WebUI Update** and select the WebUI package.
+2. Confirm the selected package.
+3. The Web UI posts the package to `http://<device-ip>/webupload` as multipart form data using the form field `webfile`.
+4. Wait for the upload result. The firmware `/update` request is not used for a WebUI package.
+
+The browser creates the multipart `Content-Type` header and boundary automatically. Do not manually change this header. Text or HTML response content is accepted; the response body determines whether the operation succeeded.
 
 ### License
 

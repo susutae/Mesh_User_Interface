@@ -201,6 +201,15 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
   const [coverageUseRfEstimate, setCoverageUseRfEstimate] = useState(true);
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(3);
   const [coverageOpacity, setCoverageOpacity] = useState(0.22);
+  // Planner state is intentionally separate from live device nodes. Nothing
+  // in this mode is posted to a device; it is a placement simulation only.
+  const [plannerMode, setPlannerMode] = useState(false);
+  const [plannerAction, setPlannerAction] = useState("nodes");
+  const [plannerFrequencyMhz, setPlannerFrequencyMhz] = useState(1320);
+  const [plannerPowerDbm, setPlannerPowerDbm] = useState(30);
+  const [plannerAreaRadiusKm, setPlannerAreaRadiusKm] = useState(1.5);
+  const [plannerAreaCenter, setPlannerAreaCenter] = useState(null);
+  const [plannedPoints, setPlannedPoints] = useState([]);
   const [selectedNodeId, setSelectedNodeId] = useState("");
   const [offlineImage, setOfflineImage] = useState(readStoredOfflineImage);
   const [offlineImageMeta, setOfflineImageMeta] = useState(readStoredOfflineImageMeta);
@@ -338,6 +347,63 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
     if (measurementPoints.length !== 2) return null;
     return distanceKmBetweenCoordinates(measurementPoints[0], measurementPoints[1]);
   }, [measurementPoints]);
+  const plannerRadiusKm = useMemo(
+    () => estimateCoverageRadiusKm({
+      frequencyMhz: numberValue(plannerFrequencyMhz),
+      outputPowerDbm: numberValue(plannerPowerDbm),
+    }) || 0.1,
+    [plannerFrequencyMhz, plannerPowerDbm],
+  );
+  const plannedNodes = useMemo(
+    () => plannedPoints.map((point) => ({
+      ...point,
+      radiusKm: plannerRadiusKm,
+      radiusMeters: plannerRadiusKm * 1000,
+      frequencyMhz: numberValue(plannerFrequencyMhz),
+      outputPowerDbm: numberValue(plannerPowerDbm),
+    })),
+    [plannedPoints, plannerFrequencyMhz, plannerPowerDbm, plannerRadiusKm],
+  );
+  const plannerCoverageAnalysis = useMemo(() => {
+    if (!plannerMode) return null;
+
+    const targetRadiusKm = clampNumber(plannerAreaRadiusKm, 0.1, 200, 1.5);
+    const nodeRadiusKm = Math.max(0.1, plannerRadiusKm);
+    if (!plannerAreaCenter) {
+      return {
+        state: "needs-area",
+        plannedCount: plannedNodes.length,
+        targetRadiusKm,
+        nodeRadiusKm,
+        reachKm: 0,
+      };
+    }
+
+    if (!plannedNodes.length) {
+      return {
+        state: "needs-nodes",
+        plannedCount: 0,
+        targetRadiusKm,
+        nodeRadiusKm,
+        reachKm: 0,
+      };
+    }
+
+    const furthestNodeKm = Math.max(
+      ...plannedNodes.map((node) =>
+        distanceKmBetweenCoordinates(plannerAreaCenter, node),
+      ),
+    );
+    const reachKm = furthestNodeKm + nodeRadiusKm;
+    return {
+      state: reachKm >= targetRadiusKm ? "ready" : "edge-gap",
+      plannedCount: plannedNodes.length,
+      targetRadiusKm,
+      nodeRadiusKm,
+      reachKm,
+      edgeMarginKm: reachKm - targetRadiusKm,
+    };
+  }, [plannerAreaCenter, plannerAreaRadiusKm, plannerMode, plannerRadiusKm, plannedNodes]);
   
 
   useEffect(() => {
@@ -359,6 +425,11 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
     coverageEnabled,
     coverageOpacity: normalisedCoverageOpacity,
     coveragePoints,
+    plannerMode,
+    plannerAction,
+    plannedNodes,
+    plannerAreaCenter,
+    plannerAreaRadiusKm: clampNumber(plannerAreaRadiusKm, 0.1, 200, 1.5),
     layer,
     linkQuality,
     onPresetCoordinate: (coordinate) => {
@@ -370,6 +441,16 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
       setMeasurementPoints((current) =>
         current.length >= 2 ? [current[1], coordinate] : [...current, coordinate],
       );
+    },
+    onPlanCoordinate: (coordinate) => {
+      if (plannerAction === "area") {
+        setPlannerAreaCenter({ x: coordinate.x, y: coordinate.y });
+        return;
+      }
+      setPlannedPoints((current) => [
+        ...current,
+        { id: `P${current.length + 1}`, x: coordinate.x, y: coordinate.y },
+      ]);
     },
     measurePoints: measurementPoints,
     onSetLayer: setLayer,
@@ -386,6 +467,109 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
   function clearMeasurement() {
     setMeasurementPoints([]);
     setMeasurementMode(false);
+  }
+
+  function clearPlanner() {
+    setPlannedPoints([]);
+    setPlannerAreaCenter(null);
+    setPlannerMode(false);
+  }
+
+  function autoPlacePlannerNodes() {
+    if (!plannerAreaCenter) {
+      setOfflineMessage(t("map.setAreaBeforeAutoPlace", "Set the target area center first."));
+      return;
+    }
+
+    const centerLatitude = Number(plannerAreaCenter.y);
+    const centerLongitude = Number(plannerAreaCenter.x);
+    const targetRadiusKm = clampNumber(plannerAreaRadiusKm, 0.1, 200, 1.5);
+    const nodeRadiusKm = Math.max(0.1, plannerRadiusKm);
+    const spacingKm = Math.max(0.08, nodeRadiusKm * 1.22);
+    // Keep node centers inside an inset boundary. Without this margin, nodes
+    // placed on the target edge appear outside the target because their own
+    // coverage rings extend beyond the dashed planning circle.
+    const placementMarginKm = Math.min(
+      targetRadiusKm * 0.3,
+      Math.max(0.25, nodeRadiusKm * 0.3),
+    );
+    const placementRadiusKm = Math.max(0.05, targetRadiusKm - placementMarginKm);
+    // candidateX/candidateY are distances in kilometres. Convert those
+    // offsets with degrees-per-kilometre, rather than degrees-per-grid-step;
+    // multiplying by the latter expands the placement grid by spacingKm.
+    const latitudeDegreesPerKm = 1 / 111.32;
+    const longitudeDegreesPerKm = 1 / (
+      111.32 * Math.max(0.12, Math.cos((centerLatitude * Math.PI) / 180))
+    );
+    const candidates = [];
+
+    for (let y = -targetRadiusKm; y <= targetRadiusKm; y += spacingKm * 0.86) {
+      const rowOffset = Math.abs(Math.round(y / (spacingKm * 0.86)) % 2) * spacingKm * 0.43;
+      for (let x = -targetRadiusKm; x <= targetRadiusKm; x += spacingKm) {
+        const candidateX = x + rowOffset;
+        if ((candidateX * candidateX) + (y * y) > placementRadiusKm * placementRadiusKm) continue;
+        candidates.push({
+          x: centerLongitude + candidateX * longitudeDegreesPerKm,
+          y: centerLatitude + y * latitudeDegreesPerKm,
+        });
+      }
+    }
+
+    // Generate the full in-area grid before applying the 64-node display cap.
+    // Capping during the row loop would keep only the first few rows and make
+    // the auto-placement appear outside or on one edge of the target area.
+    const maxPlannerNodes = 64;
+    const selectedCandidates = candidates.length <= maxPlannerNodes
+      ? candidates
+      : Array.from({ length: maxPlannerNodes }, (_, index) => {
+          const candidateIndex = Math.round(
+            (index * (candidates.length - 1)) / (maxPlannerNodes - 1),
+          );
+          return candidates[candidateIndex];
+        });
+    const points = selectedCandidates.map((point, index) => ({
+      ...point,
+      id: `P${index + 1}`,
+    }));
+
+    if (!points.length) {
+      points.push({ id: "P1", x: centerLongitude, y: centerLatitude });
+    }
+    setPlannedPoints(points);
+    setPlannerAction("nodes");
+    setOfflineMessage(t("map.autoPlaceComplete", "{count} nodes placed for the target area.", {
+      count: points.length,
+    }));
+  }
+
+  function exportPlanner() {
+    const packageData = {
+      type: "agil-coverage-plan",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      targetArea: plannerAreaCenter
+        ? {
+            center: plannerAreaCenter,
+            radiusKm: clampNumber(plannerAreaRadiusKm, 0.1, 200, 1.5),
+          }
+        : null,
+      assumptions: {
+        frequencyMhz: numberValue(plannerFrequencyMhz),
+        outputPowerDbm: numberValue(plannerPowerDbm),
+        estimatedRadiusKm: plannerRadiusKm,
+      },
+      plannedNodes,
+    };
+    const blob = new Blob([JSON.stringify(packageData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `agil-coverage-plan-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setOfflineMessage(t("map.planExported", "Coverage plan exported."));
   }
 
   const externalMapUrl = `https://www.openstreetmap.org/?mlat=${mapCenter.latitude}&mlon=${mapCenter.longitude}#map=${zoom}/${mapCenter.latitude}/${mapCenter.longitude}`;
@@ -803,7 +987,7 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
     <section className="tools-card tools-map-card">
       <div className="tools-card-title">{t("tools.maptalks", "Maptalks")}</div>
       <div className="tools-card-body">
-        <div className="tools-map-workspace">
+        <div className={`tools-map-workspace${plannerMode ? " is-planner" : ""}`}>
           {/* Main Map Area */}
           <div className="tools-map-main">
             <input
@@ -819,6 +1003,13 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
               coverageUseRfEstimate={coverageUseRfEstimate}
               coverageOpacity={normalisedCoverageOpacity}
               coverageRadiusKm={normalisedCoverageRadiusKm}
+              plannerMode={plannerMode}
+              plannerAction={plannerAction}
+              plannerFrequencyMhz={plannerFrequencyMhz}
+              plannerPowerDbm={plannerPowerDbm}
+              plannerAreaRadiusKm={plannerAreaRadiusKm}
+              plannerAreaCenter={plannerAreaCenter}
+              plannedNodes={plannedNodes}
               measureDistanceKm={measureDistanceKm}
               measurementMode={measurementMode}
               measurementPoints={measurementPoints}
@@ -848,6 +1039,22 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
               onSetCoverageUseRfEstimate={setCoverageUseRfEstimate}
               onSetCoverageOpacity={setCoverageOpacity}
               onSetCoverageRadiusKm={setCoverageRadiusKm}
+              onSetPlannerMode={(updater) => {
+                const nextMode = typeof updater === "function" ? updater(plannerMode) : updater;
+                setPlannerMode(nextMode);
+                if (nextMode) {
+                  setMeasurementMode(false);
+                  setMeasurementPoints([]);
+                  setPresetMode(false);
+                }
+              }}
+              onSetPlannerAction={setPlannerAction}
+              onSetPlannerFrequencyMhz={setPlannerFrequencyMhz}
+              onSetPlannerPowerDbm={setPlannerPowerDbm}
+              onSetPlannerAreaRadiusKm={setPlannerAreaRadiusKm}
+              onClearPlanner={clearPlanner}
+              onExportPlanner={exportPlanner}
+              onAutoPlacePlanner={autoPlacePlannerNodes}
               onSetMeasurementMode={(updater) => {
                 const nextMode =
                   typeof updater === "function" ? updater(measurementMode) : updater;
@@ -1057,6 +1264,19 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
                   <em>{t("map.coverageOverlapHint", "Overlaps appear stronger.")}</em>
                 </div>
               )}
+              {plannerMode && (
+                <div className="tools-map-planner-legend">
+                  <strong>{t("map.plannerLegendTitle", "Coverage planning")}</strong>
+                  <span>
+                    {t("map.plannerLegendDetail", "Dashed amber rings are simulated coverage, not live device status.")}
+                  </span>
+                  <span>
+                    {plannerAreaCenter
+                      ? t("map.plannerNodeHint", "Click Place Node to add a node, or use Auto Place Nodes.")
+                      : t("map.plannerSetAreaHint", "Set an area center to enable Auto Place.")}
+                  </span>
+                </div>
+              )}
               {isCalibratedOffline && (
                 <div className="tools-map-calibrated-overlay">
                   {coverageEnabled && calibratedNodePositions.length > 0 && (
@@ -1187,6 +1407,8 @@ export default function OpenMapTool({ deviceIp, protocol = "http" }) {
           <MapNodeSidebar
             nodes={nodes}
             rangeSummary={rangeSummary}
+            plannerMode={plannerMode}
+            plannerAnalysis={plannerCoverageAnalysis}
             selectedNodeId={selectedNodeId}
             validNodeCount={validNodes.length}
             onSelectNode={selectNodeOnMap}

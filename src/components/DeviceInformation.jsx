@@ -22,6 +22,9 @@ import {
 } from "../api/deviceApi.js";
 import { useI18n } from "../i18n/index.js";
 
+const PACKAGE_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+const DEVICE_UPDATE_TIMEOUT_MS = 3 * 60 * 1000;
+
 /**
  * About endpoint definitions for device information.
  * Maps API content keys to user-friendly display labels.
@@ -358,11 +361,13 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
       }),
     );
 
+    let requestStage = "upload";
     try {
       // Step 1: Upload the package
       const uploadText = await fetchText(`${baseUrl}/upload`, {
         method: "POST",
         body: form,
+        timeoutMs: PACKAGE_UPLOAD_TIMEOUT_MS,
       });
       if (!isOkResponse(uploadText)) {
         throw new Error(
@@ -382,9 +387,10 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
           { label: options.label },
         ),
       );
+      requestStage = "update";
       const updateText = await fetchText(`${baseUrl}/update`, {
         method: "GET",
-        signal: AbortSignal.timeout(180000), // 3 minutes timeout
+        timeoutMs: DEVICE_UPDATE_TIMEOUT_MS,
       });
       if (!isOkResponse(updateText)) {
         throw new Error(
@@ -405,11 +411,27 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
       // Reload device information after update
       load(new AbortController().signal);
     } catch (requestError) {
+      const timedOut =
+        requestError?.name === "AbortError" ||
+        requestError?.name === "TimeoutError" ||
+        /abort|timed?\s*out|timeout/i.test(requestError?.message || "");
       setUploadError(
-        requestError?.message ||
-          t("deviceInfo.updateFailed", "{label} update failed.", {
-            label: options.label,
-          }),
+        timedOut
+          ? requestStage === "upload"
+            ? t(
+                "deviceInfo.packageUploadTimeout",
+                "{label} package upload timed out after 5 minutes. Check the device connection and try again.",
+                { label: options.label },
+              )
+            : t(
+                "deviceInfo.deviceUpdateTimeout",
+                "The device did not respond within 3 minutes while applying the {label} update. It may still be updating or rebooting; wait before reconnecting.",
+                { label: options.label },
+              )
+          : requestError?.message ||
+              t("deviceInfo.updateFailed", "{label} update failed.", {
+                label: options.label,
+              }),
       );
       setUploadStatus("");
     } finally {
@@ -422,9 +444,22 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
   /**
    * Uploads firmware package.
    *
-   * @param {File} file - Firmware file (.tar.gz, .tgz, .bin)
+   * @param {File} file - Firmware file (.tar.gz)
    */
   function uploadFirmware(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".tar.gz")) {
+      setUploadStatus("");
+      setUploadError(
+        t(
+          "deviceInfo.firmwareTarGzRequired",
+          "Firmware update must be a .tar.gz file.",
+        ),
+      );
+      if (firmwareInputRef.current) firmwareInputRef.current.value = "";
+      return;
+    }
+
     uploadPackageAndUpdate(file, {
       label: t("deviceInfo.firmwarePackage", "firmware"),
       inputRef: firmwareInputRef,
@@ -478,6 +513,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
       const uploadText = await fetchText(`${baseUrl}/webupload`, {
         method: "POST",
         body: form,
+        timeoutMs: PACKAGE_UPLOAD_TIMEOUT_MS,
       });
       if (/FAILED/i.test(uploadText)) {
         throw new Error(
@@ -495,9 +531,18 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
         ),
       );
     } catch (requestError) {
+      const timedOut =
+        requestError?.name === "AbortError" ||
+        requestError?.name === "TimeoutError" ||
+        /abort|timed?\s*out|timeout/i.test(requestError?.message || "");
       setUploadError(
-        requestError?.message ||
-          t("deviceInfo.webuiFailed", "WebUI update failed."),
+        timedOut
+          ? t(
+              "deviceInfo.webuiUploadTimeout",
+              "WebUI package upload timed out after 5 minutes. Check the device connection and try again.",
+            )
+          : requestError?.message ||
+              t("deviceInfo.webuiFailed", "WebUI update failed."),
       );
       setUploadStatus("");
     } finally {
@@ -611,6 +656,11 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
                 {...infoRowText}
               />
               <InfoRow
+                label={t("deviceInfo.productCode", "Product Code")}
+                value="DLM-MS-1000-130150-M"
+                {...infoRowText}
+              />
+              <InfoRow
                 label={t("deviceInfo.maximumRfOutput", "Maximum RF Output")}
                 value={formatPowerDbm(about.powerMax)}
                 loading={isLoading}
@@ -624,7 +674,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
               />
               <InfoRow
                 label={t("deviceInfo.webuiVersion", "WebUI Version")}
-                value="0.1.18-dev"
+                value="0.1.20-dev"
                 {...infoRowText}
               />
             </div>
@@ -669,7 +719,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
             ref={firmwareInputRef}
             type="file"
             className="device-info-file"
-            accept=".tar.gz,.tgz,.bin,application/gzip,application/octet-stream"
+            accept=".tar.gz,application/gzip"
             onChange={(event) => uploadFirmware(event.target.files?.[0])}
           />
           <input

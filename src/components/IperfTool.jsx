@@ -195,7 +195,8 @@ export default function IperfTool({ deviceIp, protocol = "http" }) {
       ? (iperfSummary.averageThroughputMbps / targetBandwidthMbps) * 100
       : 0,
   );
-  const clientDataSent = iperfSummary.clientTransferMBytes ?? iperfSummary.serverTransferMBytes;
+  const clientBandwidthMbps = iperfSummary.clientThroughputMbps;
+  const serverBandwidthMbps = iperfSummary.serverThroughputMbps;
   const qualityStatus =
     Number.isFinite(iperfSummary.packetLossPercent) && iperfSummary.packetLossPercent > 1
       ? "poor"
@@ -679,11 +680,7 @@ export default function IperfTool({ deviceIp, protocol = "http" }) {
           <div className="tools-live-results-head">
             <div>
               <span>{t("tools.iperf.liveResults", "Live Results")}</span>
-              <strong>
-                {clientResult || serverResult
-                  ? t("tools.iperf.udpSummary", "UDP throughput summary")
-                  : t("tools.iperf.placeholder", "Run a test to see throughput results here.")}
-              </strong>
+              <strong>{t("tools.iperf.udpSummary", "UDP throughput summary")}</strong>
             </div>
             {(clientResult || serverResult) && (
               <div className="tools-ai-metrics">
@@ -723,20 +720,48 @@ export default function IperfTool({ deviceIp, protocol = "http" }) {
                       iperfSummary.recommendation,
                     )}
                   </p>
+                  {Number.isFinite(iperfSummary.averageThroughputMbps) &&
+                    Number.isFinite(targetBandwidthMbps) &&
+                    targetBandwidthMbps > 0 && (
+                      <p className="tools-ai-summary-line">
+                        {t(
+                          "tools.iperf.summaryLine",
+                          "Server average UDP throughput was {throughput} against a target of {target} ({percent}%).",
+                          {
+                            throughput: formatMetric(
+                              iperfSummary.averageThroughputMbps,
+                              "Mbps",
+                            ),
+                            target: formatMetric(targetBandwidthMbps, "Mbps"),
+                            percent: throughputPercent.toFixed(0),
+                          },
+                        )}
+                      </p>
+                    )}
                   {iperfSummary.issue && <small>{iperfSummary.issue}</small>}
                 </div>
               </section>
               <section className={`iperf-data-bar-card ${qualityStatus}`}>
+                <div className="iperf-data-bar-meta">
+                  <span>
+                    {t("tools.iperf.avgUdp", "Avg UDP")} {" "}
+                    {formatMetric(iperfSummary.averageThroughputMbps, "Mbps")}
+                  </span>
+                  <span>
+                    {t("tools.iperf.samples", "Samples")} {iperfSummary.sampleCount || "--"}
+                  </span>
+                  <span>
+                    {t("tools.iperf.datagrams", "Datagrams")} {iperfSummary.datagrams ?? "--"}
+                  </span>
+                </div>
                 <div className="iperf-data-bar-head">
                   <div>
-                    <span>{t("tools.iperf.clientDataSent", "Client data sent")}</span>
-                    <strong>{formatDataAmount(clientDataSent)}</strong>
+                    <span>{t("tools.iperf.clientBandwidth", "Client bandwidth")}</span>
+                    <strong>{formatMetric(clientBandwidthMbps, "Mbits/sec")}</strong>
                   </div>
                   <div>
-                    <span>{t("tools.iperf.serverReceived", "Server UDP received")}</span>
-                    <strong>
-                      {formatMetric(iperfSummary.averageThroughputMbps, "Mbps")}
-                    </strong>
+                    <span>{t("tools.iperf.serverBandwidth", "Server bandwidth")}</span>
+                    <strong>{formatMetric(serverBandwidthMbps, "Mbits/sec")}</strong>
                   </div>
                   <div>
                     <span>{t("tools.iperf.targetBandwidth", "Target bandwidth")}</span>

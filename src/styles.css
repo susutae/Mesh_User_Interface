@@ -2090,10 +2090,23 @@ input {
   width: min(100%, 1260px);
 }
 
+/* Keep the most useful IPERF feedback visible before the setup controls. */
+.tools-iperf-card .tools-card-body {
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.tools-iperf-card .tools-live-results {
+  order: -1;
+  min-height: 0;
+  gap: 10px;
+  padding: 12px;
+}
+
 .tools-iperf-config-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -2106,9 +2119,9 @@ input {
 
 .tools-iperf-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-muted);
@@ -2361,8 +2374,8 @@ input {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
-  padding-bottom: 10px;
+  gap: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -2383,6 +2396,36 @@ input {
   color: var(--text);
   font-size: 16px;
   font-weight: 900;
+}
+
+/* The detailed counters live with the throughput bar to avoid duplicate summaries. */
+.tools-live-results-head .tools-ai-metrics {
+  display: none;
+}
+
+.iperf-data-bar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.iperf-data-bar-meta span {
+  border: 1px solid rgba(72, 185, 211, .24);
+  border-radius: 999px;
+  background: rgba(72, 185, 211, .08);
+  padding: 4px 8px;
+}
+
+.tools-live-results .tools-ai-card-inline {
+  padding: 10px 12px;
+}
+
+.tools-live-results .iperf-data-bar-card {
+  padding: 10px 12px;
 }
 
 .tools-result-placeholder {
@@ -2451,6 +2494,11 @@ input {
   color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.tools-ai-card .tools-ai-summary-line {
+  color: var(--text);
+  font-weight: 750;
 }
 
 .tools-ai-card small {
@@ -3438,6 +3486,195 @@ button.lm-results-row {
   accent-color: var(--accent);
 }
 
+.tools-map-planner-toggle {
+  border-color: rgba(245, 158, 11, .52) !important;
+}
+
+.tools-map-planner-toggle.active {
+  border-color: #f59e0b !important;
+  background: rgba(245, 158, 11, .18) !important;
+  color: #fbbf24 !important;
+}
+
+.tools-map-planner-controls {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(180px, 1fr);
+  align-items: end;
+  gap: 7px 8px;
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 1px dashed rgba(245, 158, 11, .42);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, .07);
+}
+
+.tools-map-planner-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+
+.tools-map-planner-actions button {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.tools-map-planner-actions button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: saturate(.45);
+}
+
+.tools-map-planner-number {
+  min-width: 92px !important;
+  gap: 2px !important;
+  color: var(--muted-strong) !important;
+  font-size: 9px !important;
+}
+
+.tools-map-planner-number input {
+  width: 86px;
+  height: 28px;
+  border: 1px solid rgba(245, 158, 11, .4);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.tools-map-planner-summary {
+  align-self: center;
+  min-width: 0;
+  color: #fcd34d;
+  font-size: 10px;
+  font-weight: 760;
+  white-space: normal;
+}
+
+/* Keep the planner controls dense while leaving the map itself unobstructed. */
+.tools-map-toolbar:has(.tools-map-planner-controls) {
+  align-items: flex-start;
+  row-gap: 7px;
+}
+
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 min(100%, 760px);
+}
+
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > button,
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > .tools-map-measure-status,
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > .tools-map-measure-result,
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > .tools-map-coverage-toggle,
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > .tools-map-coverage-number,
+.tools-map-toolbar:has(.tools-map-planner-controls) > .tools-map-toolbar-actions > .tools-map-coverage-range {
+  flex: 0 0 auto;
+}
+
+/* Planner mode gets a deliberate hierarchy: exit beside the planner controls,
+   ordinary map actions below, and management stays at the toolbar edge. */
+.tools-map-workspace.is-planner {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 10px;
+}
+
+.tools-map-workspace.is-planner .tools-map-toolbar {
+  display: grid;
+  grid-template-columns: minmax(128px, auto) auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 7px 8px;
+}
+
+.tools-map-workspace.is-planner .tools-map-toolbar-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+  gap: 7px 8px;
+  min-width: 0;
+}
+
+.tools-map-workspace.is-planner .tools-map-planner-toggle {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tools-map-workspace.is-planner .tools-map-planner-controls {
+  grid-column: 2 / 6;
+  grid-row: 1;
+}
+
+.tools-map-workspace.is-planner .tools-map-toolbar-actions > :not(.tools-map-planner-toggle):not(.tools-map-planner-controls) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.tools-map-workspace.is-planner .tools-map-management {
+  grid-column: 4;
+}
+
+.tools-map-workspace.is-planner .tools-map-side {
+  align-self: start;
+}
+
+.tools-map-workspace.is-planner .tools-map-side-empty {
+  min-height: 120px;
+  padding: 14px 10px;
+}
+
+.tools-map-workspace.is-planner .tools-map-side-empty strong {
+  font-size: 12px;
+}
+
+.tools-map-workspace.is-planner .tools-map-side-empty span {
+  font-size: 10px;
+}
+
+.tools-map-warning {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+}
+
+.tools-map-planner-legend {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  display: grid;
+  gap: 3px;
+  max-width: min(310px, calc(100% - 24px));
+  padding: 8px 10px;
+  border: 1px solid rgba(245, 158, 11, .48);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, .90);
+  color: #fef3c7;
+  box-shadow: 0 12px 26px rgba(2, 6, 23, .22);
+  pointer-events: none;
+}
+
+.tools-map-planner-legend strong {
+  color: #fbbf24;
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.tools-map-planner-legend span {
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
 .tools-map-management {
   position: relative;
   margin-left: auto;
@@ -4205,14 +4442,168 @@ button.lm-results-row {
 }
 
 .tools-map-side {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   min-height: 0;
   padding: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface-muted);
+}
+
+.tools-map-insights {
+  display: grid;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 9px;
+  border: 1px solid rgba(72, 185, 211, .24);
+  border-radius: 8px;
+  background: rgba(72, 185, 211, .08);
+}
+
+.tools-map-insights-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tools-map-insights-head span {
+  color: var(--accent-strong);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.tools-map-insights-head strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.tools-map-insights p {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.tools-map-insight-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tools-map-insight-metrics > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(72, 185, 211, .16);
+  border-radius: 7px;
+  background: rgba(2, 6, 23, .22);
+}
+
+.tools-map-insight-metrics span {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.tools-map-insight-metrics strong {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tools-map-insight-metrics small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-map-insight-note {
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: rgba(2, 6, 23, .22);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.tools-map-planner-insights {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(72, 185, 211, .18);
+}
+
+.tools-map-planner-insights-title {
+  color: var(--accent-strong);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.tools-map-planner-insights-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.tools-map-planner-insights-metrics > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 6px;
+  background: rgba(2, 6, 23, .2);
+}
+
+.tools-map-planner-insights-metrics span {
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 750;
+}
+
+.tools-map-planner-insights-metrics strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-map-planner-status {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.tools-map-planner-status.ready { color: #4ade80; }
+.tools-map-planner-status.edge-gap { color: #fbbf24; }
+
+.tools-map-side-empty.compact {
+  min-height: 0;
+  padding: 10px 6px;
 }
 
 .tools-map-side-empty {
@@ -4374,6 +4765,7 @@ button.lm-results-row {
   display: grid;
   align-content: start;
   gap: 8px;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
@@ -6489,6 +6881,19 @@ button.lm-results-row {
   padding: 12px;
 }
 
+/* Keep the live signal visible before the secondary analysis panels. */
+.spectrum-graph-live .spectrum-chart-wrap {
+  order: 1;
+}
+
+.spectrum-graph-live .spectrum-ai-inline {
+  order: 2;
+}
+
+.spectrum-graph-live .spectrum-ranking {
+  order: 3;
+}
+
 .spectrum-chart-wrap {
   min-width: 0;
   overflow-x: auto;
@@ -6772,6 +7177,40 @@ button.lm-results-row {
   color: #087985;
 }
 
+.app-shell.light .tools-map-insights {
+  border-color: rgba(15, 158, 176, .22);
+  background: #eef9fc;
+  box-shadow: 0 6px 14px rgba(15, 118, 144, .06);
+}
+
+.app-shell.light .tools-map-insights-head span {
+  color: #087985;
+}
+
+.app-shell.light .tools-map-insights-head strong {
+  color: #102a38;
+}
+
+.app-shell.light .tools-map-insights p,
+.app-shell.light .tools-map-insight-metrics span {
+  color: #526173;
+}
+
+.app-shell.light .tools-map-insight-metrics > div,
+.app-shell.light .tools-map-insight-note {
+  border-color: rgba(14, 116, 144, .14);
+  background: rgba(255, 255, 255, .82);
+}
+
+.app-shell.light .tools-map-insight-metrics strong {
+  color: #087985;
+}
+
+.app-shell.light .tools-map-insight-metrics small,
+.app-shell.light .tools-map-insight-note {
+  color: #526173;
+}
+
 .app-shell.light .tools-map-range-row span {
   color: #64748b;
 }
@@ -6795,11 +7234,13 @@ button.lm-results-row {
 .app-shell.light .spectrum-chart-wrap {
   border-color: rgba(14, 116, 144, .16);
   background: #f8fdff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
 }
 
 .app-shell.light .spectrum-ranking {
   border-color: rgba(14, 116, 144, .16);
   background: #f8fdff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .04);
 }
 
 .app-shell.light .spectrum-ranking-row {
@@ -6848,11 +7289,69 @@ button.lm-results-row {
 }
 
 .app-shell.light .spectrum-chart-bg {
-  fill: #ffffff;
+  fill: #fbfeff;
 }
 
 .app-shell.light .spectrum-grid-line {
-  stroke: rgba(100, 116, 139, .18);
+  stroke: rgba(71, 101, 125, .20);
+}
+
+/* The analyzer has intentionally richer dark-theme styling; reset every
+   analyzer surface and label for the light theme so it remains readable. */
+.app-shell.light .spectrum-analyzer-wrap {
+  border-color: rgba(14, 116, 144, .20);
+  background: #f7fbfd;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+}
+
+.app-shell.light .spectrum-analyzer-chart {
+  background: #f7fbfd;
+}
+
+.app-shell.light .spectrum-analyzer-chart .spectrum-chart-bg {
+  fill: #f8fcfe;
+  stroke: rgba(71, 101, 125, .24);
+}
+
+.app-shell.light .spectrum-analyzer-chart .spectrum-grid-line {
+  stroke: rgba(71, 101, 125, .18);
+}
+
+.app-shell.light .spectrum-analyzer-heat {
+  opacity: .34;
+  mix-blend-mode: multiply;
+}
+
+.app-shell.light .spectrum-analyzer-scale text,
+.app-shell.light .spectrum-chart .spectrum-axis-label {
+  fill: #476174;
+}
+
+.app-shell.light .spectrum-analyzer-fill {
+  opacity: .38;
+  filter: none;
+}
+
+.app-shell.light .spectrum-analyzer-burst-fill {
+  opacity: .16;
+}
+
+.app-shell.light .spectrum-analyzer-trace {
+  stroke: #0891b2;
+  filter: drop-shadow(0 1px 2px rgba(8, 145, 178, .24));
+}
+
+.app-shell.light .spectrum-analyzer-burst-trace {
+  stroke: #e85d75;
+  filter: none;
+}
+
+.app-shell.light .spectrum-peak-line {
+  opacity: .9;
+}
+
+.app-shell.light .spectrum-peak-line.burst {
+  opacity: .95;
 }
 
 .app-shell.light .spectrum-empty-state circle {
@@ -6876,6 +7375,88 @@ button.lm-results-row {
 
 .app-shell.light .spectrum-point-card text {
   fill: #1f2d3d;
+}
+
+.app-shell.light .spectrum-legend span {
+  border-color: rgba(14, 116, 144, .18);
+  background: #ffffff;
+  color: #385064;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, .04);
+}
+
+.app-shell.light .spectrum-node-checks label,
+.app-shell.light .spectrum-node-actions button,
+.app-shell.light .spectrum-ai-alternates button,
+.app-shell.light .spectrum-head button {
+  border-color: rgba(14, 116, 144, .20);
+  background: #ffffff;
+  color: #245160;
+}
+
+.app-shell.light .spectrum-node-checks label:hover,
+.app-shell.light .spectrum-node-actions button:hover,
+.app-shell.light .spectrum-ai-alternates button:hover,
+.app-shell.light .spectrum-head button:not(:disabled):hover {
+  border-color: rgba(15, 158, 176, .42);
+  background: #eaf8fb;
+}
+
+.app-shell.light .spectrum-mode-toolbar,
+.app-shell.light .spectrum-controls-toolbar,
+.app-shell.light .spectrum-head,
+.app-shell.light .spectrum-graph {
+  border-color: rgba(14, 116, 144, .16);
+  background: rgba(255, 255, 255, .62);
+}
+
+.app-shell.light .spectrum-ranking-row:not(.spectrum-ranking-header) {
+  border: 1px solid rgba(14, 116, 144, .08);
+}
+
+.app-shell.light .spectrum-verdict.recommended {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.app-shell.light .spectrum-verdict.usable {
+  background: #dff6fb;
+  color: #0f6072;
+}
+
+.app-shell.light .spectrum-verdict.avoid {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+@media (max-width: 760px) {
+  .spectrum-head,
+  .spectrum-mode-toolbar,
+  .spectrum-controls-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .spectrum-head-actions,
+  .spectrum-node-actions {
+    justify-content: flex-start;
+  }
+
+  .spectrum-toolbar-divider {
+    width: 100%;
+    height: 1px;
+  }
+
+  .spectrum-ranking-table {
+    min-width: 590px;
+  }
+
+  .spectrum-legend {
+    gap: 6px;
+  }
+
+  .spectrum-legend span {
+    font-size: 10px;
+  }
 }
 
 .app-shell.light .tools-command,
@@ -6938,6 +7519,40 @@ button.lm-results-row {
   color: #14202b;
 }
 
+.app-shell.light .tools-map-planner-controls {
+  border-color: rgba(217, 119, 6, .36);
+  background: rgba(255, 247, 237, .82);
+}
+
+.app-shell.light .tools-map-planner-number {
+  color: #526173 !important;
+}
+
+.app-shell.light .tools-map-planner-number input {
+  border-color: rgba(217, 119, 6, .26);
+  background: #fffaf3;
+  color: #14202b;
+}
+
+.app-shell.light .tools-map-planner-summary {
+  color: #9a3412;
+}
+
+.app-shell.light .tools-map-planner-legend {
+  border-color: rgba(217, 119, 6, .32);
+  background: rgba(255, 251, 235, .94);
+  color: #78350f;
+  box-shadow: 0 12px 26px rgba(120, 53, 15, .12);
+}
+
+.app-shell.light .tools-map-planner-legend strong {
+  color: #9a3412;
+}
+
+.app-shell.light .tools-map-planner-legend span {
+  color: #92400e;
+}
+
 .app-shell.light .tools-map-coverage-legend {
   border-color: rgba(14, 116, 144, .16);
   background: rgba(255, 255, 255, .86);
@@ -6986,6 +7601,44 @@ button.lm-results-row {
   border-color: rgba(14, 116, 144, .18);
   background: #f7fbfd;
   color: #0f5060;
+}
+
+/* Maptalks measurement controls need stronger contrast on the pale theme. */
+.app-shell.light .tools-map-toolbar button.active {
+  border-color: #0b8aa0;
+  background: #dff7fb;
+  color: #075b6b;
+  box-shadow: 0 0 0 2px rgba(15, 158, 176, .12);
+}
+
+.app-shell.light .tools-map-measure-status,
+.app-shell.light .tools-map-measure-result {
+  border: 1px solid rgba(194, 65, 12, .24);
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.app-shell.light .tools-map-measure-result {
+  border-color: rgba(194, 65, 12, .38);
+  background: #ffedd5;
+  color: #7c2d12;
+  font-size: 12px;
+  font-weight: 850;
+  box-shadow: 0 4px 10px rgba(194, 65, 12, .10);
+}
+
+.app-shell.light .tools-map-insight-metrics > div {
+  border-color: rgba(15, 158, 176, .22);
+  background: #ffffff;
+}
+
+.app-shell.light .tools-map-insight-metrics strong {
+  font-size: 13px;
+}
+
+.app-shell.light .tools-map-insight-metrics small {
+  color: #526173;
+  font-size: 9.5px;
 }
 
 .app-shell.light .tools-map-fixed-view {
@@ -8870,6 +9523,41 @@ button.lm-results-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+    width: 100%;
+  }
+
+  .tools-map-planner-controls {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tools-map-workspace.is-planner .tools-map-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tools-map-workspace.is-planner .tools-map-toolbar-actions {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tools-map-workspace.is-planner .tools-map-planner-toggle,
+  .tools-map-workspace.is-planner .tools-map-planner-controls,
+  .tools-map-workspace.is-planner .tools-map-toolbar-actions > :not(.tools-map-planner-toggle):not(.tools-map-planner-controls) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .tools-map-planner-actions,
+  .tools-map-planner-summary {
+    grid-column: 1 / -1;
+  }
+
+  .tools-map-planner-actions button,
+  .tools-map-planner-number,
+  .tools-map-planner-number input {
     width: 100%;
   }
 

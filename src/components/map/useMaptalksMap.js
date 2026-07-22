@@ -23,11 +23,17 @@ export function useMaptalksMap({
   coverageEnabled = false,
   coverageOpacity = 0.22,
   coveragePoints = [],
+  plannerMode = false,
+  plannerAction = "nodes",
+  plannedNodes = [],
+  plannerAreaCenter = null,
+  plannerAreaRadiusKm = 1.5,
   measurePoints = [],
   layer,
   linkQuality,
   onPresetCoordinate,
   onMeasureCoordinate,
+  onPlanCoordinate,
   onSetLayer,
   presetDraft,
   selectedNode,
@@ -46,7 +52,10 @@ export function useMaptalksMap({
   const presetLayerRef = useRef(null);
   const presetCoordinateRef = useRef(onPresetCoordinate);
   const measureCoordinateRef = useRef(onMeasureCoordinate);
+  const planCoordinateRef = useRef(onPlanCoordinate);
+  const plannerModeRef = useRef(plannerMode);
   const measurementLayerRef = useRef(null);
+  const planningLayerRef = useRef(null);
   const validNodeSignature = validNodes.map((node) => node.id).join("|");
   const [zoom, setZoom] = useState(13);
   const [hasAutoFitted, setHasAutoFitted] = useState(false);
@@ -58,6 +67,11 @@ export function useMaptalksMap({
   useEffect(() => {
     measureCoordinateRef.current = onMeasureCoordinate;
   }, [onMeasureCoordinate]);
+
+  useEffect(() => {
+    planCoordinateRef.current = onPlanCoordinate;
+    plannerModeRef.current = plannerMode;
+  }, [onPlanCoordinate, plannerMode]);
 
   const fitMapToNodes = useCallback(
     (nodesToFit = validNodes) => {
@@ -201,9 +215,16 @@ export function useMaptalksMap({
     measurementLayerRef.current = new maptalks.VectorLayer("distance-measurement", {
       zIndex: 5,
     }).addTo(map);
+    planningLayerRef.current = new maptalks.VectorLayer("coverage-planner", {
+      zIndex: 6,
+    }).addTo(map);
 
     map.on("zoomend", () => setZoom(map.getZoom()));
     map.on("click", (event) => {
+      if (plannerModeRef.current) {
+        planCoordinateRef.current?.(event.coordinate);
+        return;
+      }
       presetCoordinateRef.current?.(event.coordinate);
       measureCoordinateRef.current?.(event.coordinate);
     });
@@ -217,6 +238,7 @@ export function useMaptalksMap({
       markerLayerRef.current = null;
       presetLayerRef.current = null;
       measurementLayerRef.current = null;
+      planningLayerRef.current = null;
     };
   }, []);
 
@@ -389,6 +411,76 @@ export function useMaptalksMap({
       );
     }
   }, [measurePoints, suppressVectors]);
+
+  // Planner-only geometry stays visually distinct from live node coverage.
+  useEffect(() => {
+    const layerRef = planningLayerRef.current;
+    if (!layerRef) return;
+
+    layerRef.clear();
+    if (suppressVectors || !plannerMode) return;
+
+    const areaGeometries = [];
+    const nodeCoverageGeometries = [];
+    const nodeMarkers = [];
+    if (plannerAreaCenter) {
+      areaGeometries.push(
+        new maptalks.Circle(
+          [Number(plannerAreaCenter.x), Number(plannerAreaCenter.y)],
+          Number(plannerAreaRadiusKm) * 1000,
+          {
+            symbol: {
+              polygonFill: "#f59e0b",
+              polygonOpacity: 0.035,
+              lineColor: "#f59e0b",
+              lineOpacity: 0.92,
+              lineWidth: 2,
+              lineDasharray: [8, 5],
+            },
+          },
+        ),
+      );
+    }
+
+    plannedNodes.forEach((node) => {
+      const coordinate = [Number(node.x), Number(node.y)];
+      nodeCoverageGeometries.push(
+        new maptalks.Circle(coordinate, Number(node.radiusMeters) || 100, {
+          symbol: {
+            polygonFill: "#f59e0b",
+            polygonOpacity: 0.12,
+            lineColor: "#fbbf24",
+            lineOpacity: 0.88,
+            lineWidth: 2,
+            lineDasharray: [6, 4],
+          },
+        }),
+      );
+      nodeMarkers.push(
+        new maptalks.Marker(coordinate, {
+          properties: { id: node.id, planner: true },
+          symbol: {
+            markerType: "ellipse",
+            markerFill: "#f59e0b",
+            markerLineColor: "#fffbeb",
+            markerLineWidth: 2,
+            markerWidth: 24,
+            markerHeight: 24,
+            textName: node.id,
+            textFill: "#111827",
+            textSize: 9,
+            textWeight: "bold",
+          },
+        }),
+      );
+    });
+
+    // Add each geometry type separately. This avoids mixed Geometry arrays
+    // being partially rendered by different Maptalks versions.
+    if (areaGeometries.length) layerRef.addGeometry(areaGeometries);
+    if (nodeCoverageGeometries.length) layerRef.addGeometry(nodeCoverageGeometries);
+    if (nodeMarkers.length) layerRef.addGeometry(nodeMarkers);
+  }, [plannerAreaCenter, plannerAreaRadiusKm, plannedNodes, plannerMode, suppressVectors]);
 
   useEffect(() => {
     const map = mapRef.current;

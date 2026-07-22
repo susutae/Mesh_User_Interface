@@ -86,7 +86,12 @@ export function extractIperfMetrics(text) {
     const datagrams = line.match(/(\d+)\s+datagrams/i);
     if (datagrams) metrics.datagrams = Number(datagrams[1]);
 
-    if (/warning|error|failed|lost|out-of-order/i.test(line)) {
+    // Do not treat IPERF's standard "Lost/Total Datagrams" column header as an error.
+    // Packet loss is parsed above and evaluated against its numeric threshold.
+    if (
+      /\b(?:warning|error|failed|failure)\b/i.test(line) ||
+      /\bout-of-order\b/i.test(line)
+    ) {
       metrics.warnings.push(line);
     }
   });
@@ -183,8 +188,8 @@ export function buildIperfSummary(clientResult, serverResult) {
 
   if (hasResult) {
     if (issues.length) {
-      headline = "Review needed";
-      recommendation = "The result contains warnings or errors. Check that the server session is still running and that the client is using the correct server node IP, UDP port, and session ID.";
+      headline = "Test needs attention";
+      recommendation = "Throughput is below the requested target and the result contains a warning. Confirm the server session and client/server parameters, then retry with lower bandwidth.";
     } else if (Number.isFinite(packetLoss) && packetLoss > 1) {
       headline = "Packet loss detected";
       recommendation = "Packet loss is above the preferred range. Try lower bandwidth, verify RF/link quality, and rerun the test.";
@@ -193,7 +198,7 @@ export function buildIperfSummary(clientResult, serverResult) {
       recommendation = "Jitter is elevated. Retest with lower load or check for interference and congestion.";
     } else if (Number.isFinite(averageThroughputMbps)) {
       headline = "IPERF result looks stable";
-      recommendation = "Average UDP throughput is calculated from the interval samples over the test period. Compare it with the requested bandwidth and link quality before accepting the result.";
+      recommendation = "UDP throughput is consistent, with packet loss and jitter within the preferred range. Compare the measured server throughput with the requested target before accepting the result.";
     } else {
       headline = "Result received";
       recommendation = "The response was received, but no standard IPERF throughput line was found yet. Refresh once the test has run longer.";
@@ -204,6 +209,9 @@ export function buildIperfSummary(clientResult, serverResult) {
     headline,
     recommendation,
     averageThroughputMbps,
+    clientThroughputMbps: client.throughputMbps,
+    serverThroughputMbps:
+      server.averageThroughputMbps ?? server.throughputMbps,
     throughputMbps: primary.throughputMbps,
     clientTransferMBytes: client.transferMBytes,
     serverTransferMBytes: server.transferMBytes,

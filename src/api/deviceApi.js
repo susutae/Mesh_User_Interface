@@ -32,12 +32,22 @@ export async function requestJson(url, options = {}) {
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const normalized = normalizeFetchOptions(options);
+  const configuredTimeout = Number(normalized.timeoutMs);
+  const effectiveTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+    ? configuredTimeout
+    : timeoutMs;
+  const { timeoutMs: _timeoutMs, ...fetchOptions } = normalized;
   const timeoutController = new AbortController();
-  const timer = window.setTimeout(() => timeoutController.abort(), timeoutMs);
-  const onAbort = () => timeoutController.abort();
+  const timer = window.setTimeout(
+    () => timeoutController.abort(new DOMException("Request timed out", "TimeoutError")),
+    effectiveTimeoutMs,
+  );
+  const onAbort = () => timeoutController.abort(
+    normalized.signal?.reason || new DOMException("Request aborted", "AbortError"),
+  );
   normalized.signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    return await fetch(url, { ...normalized, signal: timeoutController.signal });
+    return await fetch(url, { ...fetchOptions, signal: timeoutController.signal });
   } finally {
     window.clearTimeout(timer);
     normalized.signal?.removeEventListener("abort", onAbort);

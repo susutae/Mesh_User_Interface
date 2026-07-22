@@ -7,6 +7,13 @@ export default function MapToolbar({
   coverageUseRfEstimate = true,
   coverageOpacity = 0.22,
   coverageRadiusKm = 3,
+  plannerMode = false,
+  plannerAction = "nodes",
+  plannerFrequencyMhz = 1320,
+  plannerPowerDbm = 30,
+  plannerAreaRadiusKm = 1.5,
+  plannerAreaCenter = null,
+  plannedNodes = [],
   measureDistanceKm = null,
   measurementMode = false,
   measurementPoints = [],
@@ -26,6 +33,14 @@ export default function MapToolbar({
   onSetCoverageUseRfEstimate,
   onSetCoverageOpacity,
   onSetCoverageRadiusKm,
+  onSetPlannerMode,
+  onSetPlannerAction,
+  onSetPlannerFrequencyMhz,
+  onSetPlannerPowerDbm,
+  onSetPlannerAreaRadiusKm,
+  onClearPlanner,
+  onExportPlanner,
+  onAutoPlacePlanner,
   onSetMeasurementMode,
   onClearMeasurement,
   onSetLayer,
@@ -99,6 +114,98 @@ export default function MapToolbar({
       )}
 
       <div className="tools-map-toolbar-actions">
+        <button
+          type="button"
+          className={plannerMode ? "active tools-map-planner-toggle" : "tools-map-planner-toggle"}
+          onClick={() => onSetPlannerMode((current) => !current)}
+        >
+          {plannerMode
+            ? t("map.exitPlanner", "Exit Planner")
+            : t("map.planCoverage", "Plan Coverage")}
+        </button>
+        {plannerMode && (
+          <div className="tools-map-planner-controls">
+            <div className="tools-map-planner-actions" role="group" aria-label={t("map.plannerActions", "Planner actions")}>
+              <button
+                type="button"
+                className={plannerAction === "area" ? "active" : ""}
+                onClick={() => onSetPlannerAction("area")}
+              >
+                {t("map.setTargetArea", "Set Area Center")}
+              </button>
+              <button
+                type="button"
+                className={plannerAction === "nodes" ? "active" : ""}
+                onClick={() => onSetPlannerAction("nodes")}
+              >
+                {t("map.placePlannedNode", "Place Node")}
+              </button>
+              <button
+                type="button"
+                disabled={!plannerAreaCenter}
+                title={
+                  plannerAreaCenter
+                    ? t("map.autoPlaceHint", "Place a coverage grid inside the target area")
+                    : t("map.setAreaBeforeAutoPlace", "Set the target area center first.")
+                }
+                onClick={onAutoPlacePlanner}
+              >
+                {t("map.autoPlace", "Auto Place Nodes")}
+              </button>
+              {plannedNodes.length > 0 && (
+                <>
+                  <button type="button" onClick={onExportPlanner}>
+                    {t("map.exportPlan", "Export Plan")}
+                  </button>
+                  <button type="button" onClick={onClearPlanner}>
+                    {t("map.clearPlan", "Clear Plan")}
+                  </button>
+                </>
+              )}
+            </div>
+            <label className="tools-map-planner-number">
+              <span>{t("map.plannerFrequency", "Frequency MHz")}</span>
+              <input
+                type="number"
+                min="1"
+                step="0.1"
+                value={plannerFrequencyMhz}
+                onChange={(event) => onSetPlannerFrequencyMhz(event.target.value)}
+              />
+            </label>
+            <label className="tools-map-planner-number">
+              <span>{t("map.plannerPower", "TX Power dBm")}</span>
+              <input
+                type="number"
+                min="-20"
+                max="80"
+                step="0.1"
+                value={plannerPowerDbm}
+                onChange={(event) => onSetPlannerPowerDbm(event.target.value)}
+              />
+            </label>
+            <label className="tools-map-planner-number">
+              <span>{t("map.plannerAreaRadius", "Target area km")}</span>
+              <input
+                type="number"
+                min="0.1"
+                max="200"
+                step="0.1"
+                value={plannerAreaRadiusKm}
+                onChange={(event) => onSetPlannerAreaRadiusKm(event.target.value)}
+              />
+            </label>
+            <span className="tools-map-planner-summary">
+              {t("map.plannerSummary", "{count} planned nodes · {radius} km estimated radius", {
+                count: plannedNodes.length,
+                radius: plannedNodes[0]?.radiusKm?.toFixed?.(2) || "--",
+              })}
+              {plannerAreaCenter
+                ? ` · ${t("map.targetAreaSet", "target area set")}`
+                : ` · ${t("map.plannerSetAreaHint", "set an area center to enable Auto Place")}`}
+            </span>
+          </div>
+        )}
         <button
           type="button"
           className={measurementMode ? "active" : ""}

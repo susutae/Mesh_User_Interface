@@ -1229,28 +1229,17 @@ export default function ConfigurationPage({
     );
 
     if (!nextValue) {
-      try {
-        await postJson(
-          `${baseUrl}/config?content=configGlobal`,
-          { configGlobal: false },
-          controller.signal,
-        );
-        setUpdateAllNodes(false);
-        setNotice(
-          t(
-            "configuration.updateAllDisabled",
-            "Update All Nodes disabled. Settings will apply to this node only.",
-          ),
-        );
-      } catch (requestError) {
-        setError(
-          requestError?.message ||
-            t("configuration.updateAllFailed", "Unable to update configGlobal."),
-        );
-        setNotice("");
-      } finally {
-        setUpdatingGlobal(false);
-      }
+      // configGlobal is an apply-time command flag on the device. Firmware
+      // rejects configGlobal=false, so disabling only changes the UI mode.
+      // Subsequent applies omit configGlobal and therefore target this node.
+      setUpdateAllNodes(false);
+      setNotice(
+        t(
+          "configuration.updateAllDisabled",
+          "Update All Nodes disabled. Settings will apply to this node only.",
+        ),
+      );
+      setUpdatingGlobal(false);
       return;
     }
 
@@ -2565,32 +2554,11 @@ export default function ConfigurationPage({
             </div>
           </header>
 
-          {/* Status messages */}
-          {error && <div className="configuration-error">{error}</div>}
-          {notice && <div className="configuration-notice">{notice}</div>}
-
-          {/* Active configuration component */}
-          <ActiveConfig
-            draft={draft}
-            onChange={updateDraft}
-            onManageFrequency={openManagedEditor}
-            selectedAntenna={selectedAntenna}
-            onSelectedAntennaChange={setSelectedAntenna}
-            initialSectionTitle={target?.tab === activeTab ? target.section : ""}
-            activeSectionTitle={activeSectionTitle}
-            onActiveSectionTitleChange={setActiveSectionTitle}
-            highlightFieldId={
-              target?.tab === activeTab && target?.section === activeSectionTitle
-                ? target.field
-                : ""
-            }
-            highlightNonce={target?.nonce}
-            modifiedFieldKeys={modifiedFieldKeys}
-            showSectionTabs={false}
-            showAllSections={activeTab === "global"}
-          />
-
-          <div className="configuration-apply-dock">
+          <div
+            className={`configuration-apply-dock ${
+              pendingApplyEntries.length ? "has-changes" : "is-idle"
+            }`}
+          >
             <div
               className={`configuration-unsaved-summary ${
                 pendingApplyEntries.length ? "has-changes" : ""
@@ -2649,6 +2617,31 @@ export default function ConfigurationPage({
                   : t("common.applyChanges", "Apply Changes")}
             </button>
           </div>
+
+          {/* Status messages */}
+          {error && <div className="configuration-error">{error}</div>}
+          {notice && <div className="configuration-notice">{notice}</div>}
+
+          {/* Active configuration component */}
+          <ActiveConfig
+            draft={draft}
+            onChange={updateDraft}
+            onManageFrequency={openManagedEditor}
+            selectedAntenna={selectedAntenna}
+            onSelectedAntennaChange={setSelectedAntenna}
+            initialSectionTitle={target?.tab === activeTab ? target.section : ""}
+            activeSectionTitle={activeSectionTitle}
+            onActiveSectionTitleChange={setActiveSectionTitle}
+            highlightFieldId={
+              target?.tab === activeTab && target?.section === activeSectionTitle
+                ? target.field
+                : ""
+            }
+            highlightNonce={target?.nonce}
+            modifiedFieldKeys={modifiedFieldKeys}
+            showSectionTabs={false}
+            showAllSections={activeTab === "global"}
+          />
         </div>
       </div>
 

@@ -269,7 +269,19 @@ Common controls:
 - **Reset All**: resets draft values back to the latest loaded values.
 - **Update All Nodes**: enables global configuration mode for supported `*` parameters.
 - **Search**: jumps directly to matching tabs or settings, such as frequency, DHCP, encryption, GPS, or Ethernet.
-- **Apply Changes**: posts all modified settings after the Review Changes confirmation.
+- **Apply Changes**: opens the Review Changes confirmation and then posts all modified settings.
+
+### Sticky Apply Changes Card
+
+The compact **Apply Changes** card is anchored near the top-left of the Configuration workspace, below the page controls. It remains sticky while the operator scrolls through long configuration sections, keeping the save action visible without covering the settings.
+
+The card displays:
+
+- **No unsaved changes** when the current values match the loaded device configuration.
+- A concise list of modified areas when draft changes exist.
+- **Apply Changes (n)**, where `n` is the number of unsaved parameters in the active configuration category.
+
+The card belongs only to the Configuration workspace. In Split View, it stays inside the Configuration pane and does not overlay Monitor, Tools, or the second pane. On narrow mobile screens, the card expands to the available Configuration width and stacks its summary and action when needed.
 
 ### Configuration Search
 
@@ -292,7 +304,7 @@ Draft indicators:
 
 - The changed input, dropdown, slider, or manager field shows a bright amber/yellow border.
 - A small **Draft** label appears beside the field name.
-- The **Apply Changes** button in the bottom-right corner increments its count, for example **Apply Changes (2)**.
+- The sticky **Apply Changes** card increments its count, for example **Apply Changes (2)**.
 - A compact unsaved-changes summary appears near the Apply button so the operator can see which areas have pending edits before opening the review modal.
 
 The number in **Apply Changes (n)** is the number of unsaved modified parameters for the active configuration category.
@@ -842,6 +854,7 @@ Configuration layout behavior:
 - **Desktop / Tablet**: configuration cards can use a two-column layout. For example, RF Basic places Core Parameters on the left and Dual Settings on the right to use the available screen width efficiently.
 - **Global**: all global cards are shown together in a responsive card grid. On wider screens, multiple cards can appear side by side in the main canvas.
 - **Mobile**: configuration cards collapse into a single vertical column. Field labels are placed directly above their input fields so values remain readable on narrow screens.
+- **Apply Changes card**: remains sticky within the Configuration workspace while scrolling. It is compact on desktop and tablet, and uses the available pane width on mobile without covering configuration fields.
 
 ## 14. Common User Workflows
 

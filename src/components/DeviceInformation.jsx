@@ -684,7 +684,7 @@ export default function DeviceInformation({ deviceIp, protocol = "http" }) {
               />
               <InfoRow
                 label={t("deviceInfo.webuiVersion", "WebUI Version")}
-                value="0.1.20-dev"
+                value="0.1.21-dev"
                 {...infoRowText}
               />
             </div>

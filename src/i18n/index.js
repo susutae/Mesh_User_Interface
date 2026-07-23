@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import zhTWReference from "./zhTWReference";
 
 const STORAGE_KEY = "agil-language";
 
@@ -2507,6 +2508,7 @@ function traditionalize(value) {
 }
 
 dictionaries.zhTW = traditionalize(dictionaries.zh);
+dictionaries.zhTW = mergeDictionaries(dictionaries.zhTW, zhTWReference);
 dictionaries.zhTW = mergeDictionaries(dictionaries.zhTW, {
   language: {
     label: "語言",
